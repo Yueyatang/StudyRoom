@@ -1,24 +1,16 @@
 import promptAction from '@ohos.promptAction';
-
-interface TodoItem {
-  text: string;
-  completed: boolean;
-}
-
-interface SceneData {
-  name: string;
-  bgColor: string;
-  atmosphere: string;
-  quote: string;
-}
+import { SceneSelector } from '../components/SceneSelector';
+import { TimerComponent } from '../components/TimerComponent';
+import { TodoComponent } from '../components/TodoComponent';
+import { SceneData, TimerMode, TodoItem } from '../common/StudyRoomTypes';
 
 @Entry
 @Component
 struct StudyRoom {
   @State scenes: SceneData[] = [
-    { name: '森林秘境', bgColor: '#2D5A3B', atmosphere: '🌲 松涛轻语 · 清新氧气', quote: '静听松风，心如止水' },
-    { name: '海滨浪潮', bgColor: '#2A6B7C', atmosphere: '🌊 浪花白噪音 · 无垠海蓝', quote: '潮汐陪伴，沉浸于知识海洋' },
-    { name: '城市夜景', bgColor: '#2C2E3E', atmosphere: '🌃 璀璨灯火 · 都市脉搏', quote: '万家灯火时，正是上进心' }
+    { name: '森林秘境', bgColor: '#2D5A3B', atmosphere: '松风轻语 · 清新氧气', quote: '静听松风，心如止水' },
+    { name: '海岸潮汐', bgColor: '#2A6B7C', atmosphere: '浪花白噪音 · 无垠海蓝', quote: '潮汐相伴，沉浸于知识海洋' },
+    { name: '城市夜景', bgColor: '#2C2E3E', atmosphere: '霓虹灯火 · 都市脉搏', quote: '万家灯火时，正是精进时' }
   ];
 
   @State currentSceneIndex: number = 0;
@@ -29,13 +21,20 @@ struct StudyRoom {
   @State currentTime: string = '';
   @State todoList: TodoItem[] = [];
   @State newTodoText: string = '';
+  @State currentMode: TimerMode = 'focus';
+  @State focusDuration: number = 25 * 60;
+  @State shortBreakDuration: number = 5 * 60;
+  @State longBreakDuration: number = 15 * 60;
+  @State completedFocusSessions: number = 0;
+  @State totalFocusMinutes: number = 0;
+  @State currentSessionTotalSeconds: number = 25 * 60;
 
   private timerId: number = -1;
   private clockId: number = -1;
 
   aboutToAppear() {
     this.loadData();
-    this.updateTimerDisplay();
+    this.applyCurrentModeDuration();
     this.startClock();
   }
 
@@ -75,12 +74,10 @@ struct StudyRoom {
         const parsed: TodoItem[] = JSON.parse(savedTodos);
         if (Array.isArray(parsed)) {
           this.todoList = parsed;
-        } else {
-          this.initDefaultTodos();
+          return;
         }
-      } else {
-        this.initDefaultTodos();
       }
+      this.initDefaultTodos();
     } catch (e) {
       this.initDefaultTodos();
     }
@@ -88,9 +85,9 @@ struct StudyRoom {
 
   initDefaultTodos() {
     this.todoList = [
-      { text: '深度阅读 30分钟', completed: false },
-      { text: '复习笔记 2章', completed: false },
-      { text: '撰写项目计划', completed: false }
+      { text: '深度阅读 30 分钟', completed: false },
+      { text: '复习笔记 2 章', completed: false },
+      { text: '整理项目计划', completed: false }
     ];
     this.saveTodos();
   }
@@ -100,20 +97,64 @@ struct StudyRoom {
     AppStorage.setOrCreate('tomatoCount', this.tomatoCount);
   }
 
+  getDurationForMode(mode: TimerMode): number {
+    if (mode === 'focus') {
+      return this.focusDuration;
+    }
+    if (mode === 'shortBreak') {
+      return this.shortBreakDuration;
+    }
+    return this.longBreakDuration;
+  }
+
+  getModeLabel(mode: TimerMode): string {
+    if (mode === 'focus') {
+      return 'Focus';
+    }
+    if (mode === 'shortBreak') {
+      return 'Short Break';
+    }
+    return 'Long Break';
+  }
+
+  applyCurrentModeDuration() {
+    this.totalSeconds = this.getDurationForMode(this.currentMode);
+    this.currentSessionTotalSeconds = this.totalSeconds;
+    this.updateTimerDisplay();
+  }
+
   updateTimerDisplay() {
     const mins = Math.floor(this.totalSeconds / 60);
     const secs = this.totalSeconds % 60;
     this.timerDisplay = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 
     if (this.totalSeconds === 0 && this.isRunning) {
-      this.stopTimer();
+      this.completeCurrentSession();
+    }
+  }
+
+  completeCurrentSession() {
+    this.stopTimer();
+    if (this.currentMode === 'focus') {
       this.tomatoCount = this.tomatoCount + 1;
+      this.completedFocusSessions = this.completedFocusSessions + 1;
+      this.totalFocusMinutes = this.totalFocusMinutes + Math.floor(this.currentSessionTotalSeconds / 60);
       this.saveTodos();
+
+      const nextMode: TimerMode = this.completedFocusSessions % 4 === 0 ? 'longBreak' : 'shortBreak';
+      this.switchMode(nextMode, true);
       promptAction.showToast({
-        message: '🎉 专注完成！番茄+1',
+        message: `专注完成，接下来进入${this.getModeLabel(nextMode)}`,
         duration: 2000
       });
+      return;
     }
+
+    this.switchMode('focus', true);
+    promptAction.showToast({
+      message: '休息结束，回到专注',
+      duration: 2000
+    });
   }
 
   startTimer() {
@@ -121,8 +162,7 @@ struct StudyRoom {
       return;
     }
     if (this.totalSeconds <= 0) {
-      this.totalSeconds = 25 * 60;
-      this.updateTimerDisplay();
+      this.applyCurrentModeDuration();
     }
     this.isRunning = true;
     this.timerId = setInterval(() => {
@@ -147,20 +187,38 @@ struct StudyRoom {
 
   resetTimer() {
     this.stopTimer();
-    this.totalSeconds = 25 * 60;
-    this.updateTimerDisplay();
+    this.applyCurrentModeDuration();
   }
 
   addMinutes(minutes: number) {
-    let newSec = this.totalSeconds + minutes * 60;
-    if (newSec < 0) {
-      newSec = 0;
+    let newSeconds = this.totalSeconds + minutes * 60;
+    if (newSeconds < 0) {
+      newSeconds = 0;
     }
-    if (newSec > 7200) {
-      newSec = 7200;
+    if (newSeconds > 7200) {
+      newSeconds = 7200;
     }
-    this.totalSeconds = newSec;
+
+    if (this.currentMode === 'focus') {
+      this.focusDuration = newSeconds;
+    } else if (this.currentMode === 'shortBreak') {
+      this.shortBreakDuration = newSeconds;
+    } else {
+      this.longBreakDuration = newSeconds;
+    }
+
+    this.totalSeconds = newSeconds;
+    this.currentSessionTotalSeconds = newSeconds;
     this.updateTimerDisplay();
+  }
+
+  switchMode(mode: TimerMode, autoStart: boolean = false) {
+    this.stopTimer();
+    this.currentMode = mode;
+    this.applyCurrentModeDuration();
+    if (autoStart) {
+      this.startTimer();
+    }
   }
 
   switchScene(index: number) {
@@ -176,11 +234,10 @@ struct StudyRoom {
     if (this.newTodoText.trim() === '') {
       return;
     }
-    const newItem: TodoItem = {
+    this.todoList.push({
       text: this.newTodoText,
       completed: false
-    };
-    this.todoList.push(newItem);
+    });
     this.newTodoText = '';
     this.saveTodos();
   }
@@ -192,129 +249,51 @@ struct StudyRoom {
 
   build() {
     Stack() {
-      // 1. 背景层
       Column()
         .width('100%')
         .height('100%')
         .backgroundColor(this.scenes[this.currentSceneIndex].bgColor)
 
-      // 2. 内容层：使用 Column 自动分配高度
       Column() {
-        // 状态栏占位（使用固定数值，不再使用无效的 CSS 变量）
         Row()
-          .height(24)  // ✅ 修改：固定高度
+          .height(24)
           .width('100%')
 
-        // 滚动区域：使用 layoutWeight 填充剩余空间
         Scroll() {
           Column() {
-            // 场景切换按钮
-            Row() {
-              ForEach(this.scenes, (scene: SceneData, index: number) => {
-                Text(scene.name)
-                  .fontSize(14)
-                  .fontColor(this.currentSceneIndex === index ? '#FFD878' : '#FFFFFF')
-                  .fontWeight(this.currentSceneIndex === index ? FontWeight.Bold : FontWeight.Normal)
-                  .width('33%')
-                  .height(44)
-                  .textAlign(TextAlign.Center)
-                  .borderRadius(22)
-                  .backgroundColor(this.currentSceneIndex === index ? 'rgba(255,216,120,0.25)' : 'rgba(255,255,255,0.1)')
-                  .onClick(() => {
-                    this.switchScene(index);
-                  })
-              })
-            }
-            .width('90%')
-            .margin({ top: 16, bottom: 12 })
-
-            // 氛围文字
-            Text(this.scenes[this.currentSceneIndex].atmosphere)
-              .fontSize(12)
-              .fontColor('#E0E0E0')
-              .padding({ left: 16, right: 16, top: 6, bottom: 6 })
-              .backgroundColor('rgba(0,0,0,0.2)')
-              .borderRadius(40)
-              .margin({ bottom: 16 })
-
-            // 计时器卡片
-            Column() {
-              Text(this.timerDisplay)
-                .fontSize(56)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#FFFFFF')
-                .fontFamily('monospace')
-                .letterSpacing(6)
-                .margin({ top: 12, bottom: 12 })
-
-              Row() {
-                Button('开始')
-                  .fontSize(14)
-                  .height(38)
-                  .padding({ left: 20, right: 20 })
-                  .backgroundColor('rgba(100,120,200,0.8)')
-                  .borderRadius(38)
-                  .onClick(() => {
-                    this.startTimer();
-                  })
-
-                Button('暂停')
-                  .fontSize(14)
-                  .height(38)
-                  .padding({ left: 20, right: 20 })
-                  .backgroundColor('rgba(60,60,80,0.8)')
-                  .borderRadius(38)
-                  .margin({ left: 10 })
-                  .onClick(() => {
-                    this.pauseTimer();
-                  })
-
-                Button('重置')
-                  .fontSize(14)
-                  .height(38)
-                  .padding({ left: 20, right: 20 })
-                  .backgroundColor('rgba(60,60,80,0.8)')
-                  .borderRadius(38)
-                  .margin({ left: 10 })
-                  .onClick(() => {
-                    this.resetTimer();
-                  })
+            SceneSelector({
+              scenes: this.scenes,
+              currentSceneIndex: this.currentSceneIndex,
+              onSceneChange: (index: number) => {
+                this.switchScene(index);
               }
+            })
 
-              Row() {
-                Button('-5')
-                  .fontSize(12)
-                  .height(34)
-                  .backgroundColor('rgba(45,50,65,0.8)')
-                  .borderRadius(34)
-                  .layoutWeight(1)
-                  .onClick(() => {
-                    this.addMinutes(-5);
-                  })
-
-                Button('+5')
-                  .fontSize(12)
-                  .height(34)
-                  .backgroundColor('rgba(45,50,65,0.8)')
-                  .borderRadius(34)
-                  .layoutWeight(1)
-                  .margin({ left: 12 })
-                  .onClick(() => {
-                    this.addMinutes(5);
-                  })
+            TimerComponent({
+              timerDisplay: this.timerDisplay,
+              currentMode: this.currentMode,
+              isRunning: this.isRunning,
+              completedFocusSessions: this.completedFocusSessions,
+              totalFocusMinutes: this.totalFocusMinutes,
+              onStart: () => {
+                this.startTimer();
+              },
+              onPause: () => {
+                this.pauseTimer();
+              },
+              onReset: () => {
+                this.resetTimer();
+              },
+              onAdjustMinutes: (minutes: number) => {
+                this.addMinutes(minutes);
+              },
+              onSelectMode: (mode: TimerMode) => {
+                this.switchMode(mode);
               }
-              .width('100%')
-              .margin({ top: 10, bottom: 10 })
-            }
-            .width('90%')
-            .backgroundColor('rgba(30,34,48,0.6)')
-            .borderRadius(28)
-            .padding(16)
-            .margin({ bottom: 16 })
+            })
 
-            // 番茄统计
             Row() {
-              Text('🍅 今日番茄钟')
+              Text('今日番茄数')
                 .fontSize(14)
                 .fontColor('#CCCCCC')
               Blank()
@@ -329,74 +308,22 @@ struct StudyRoom {
             .padding({ left: 18, right: 18, top: 10, bottom: 10 })
             .margin({ bottom: 16 })
 
-            // 待办清单卡片
-            Column() {
-              Row() {
-                Text('📝 沉浸待办')
-                  .fontSize(16)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor('#FFFFFF')
-                Blank()
+            TodoComponent({
+              todoList: this.todoList,
+              newTodoText: this.newTodoText,
+              onToggle: (index: number) => {
+                this.toggleTodo(index);
+              },
+              onDelete: (index: number) => {
+                this.deleteTodo(index);
+              },
+              onTextChange: (value: string) => {
+                this.newTodoText = value;
+              },
+              onAdd: () => {
+                this.addTodo();
               }
-              .width('100%')
-              .margin({ bottom: 10 })
-
-              ForEach(this.todoList, (item: TodoItem, index: number) => {
-                Row() {
-                  Checkbox()
-                    .select(item.completed)
-                    .onChange((val: boolean) => {
-                      this.toggleTodo(index);
-                    })
-                  Text(item.text)
-                    .fontSize(14)
-                    .fontColor(item.completed ? '#888888' : '#EEEEEE')
-                    .decoration({ type: item.completed ? TextDecorationType.LineThrough : TextDecorationType.None })
-                    .margin({ left: 8 })
-                    .layoutWeight(1)
-                  Button('删')
-                    .fontSize(11)
-                    .height(26)
-                    .backgroundColor('rgba(255,255,255,0.15)')
-                    .borderRadius(13)
-                    .onClick(() => {
-                      this.deleteTodo(index);
-                    })
-                }
-                .width('100%')
-                .margin({ bottom: 6 })
-              })
-
-              Row() {
-                TextInput({ placeholder: '添加新任务...', text: this.newTodoText })
-                  .fontSize(14)
-                  .height(38)
-                  .layoutWeight(1)
-                  .backgroundColor('rgba(255,255,255,0.15)')
-                  .borderRadius(20)
-                  .padding({ left: 14 })
-                  .onChange((value: string) => {
-                    this.newTodoText = value;
-                  })
-                Button('+')
-                  .fontSize(18)
-                  .height(38)
-                  .width(42)
-                  .backgroundColor('rgba(255,180,70,0.8)')
-                  .borderRadius(20)
-                  .margin({ left: 8 })
-                  .onClick(() => {
-                    this.addTodo();
-                  })
-              }
-              .width('100%')
-              .margin({ top: 8 })
-            }
-            .width('90%')
-            .backgroundColor('rgba(30,34,48,0.6)')
-            .borderRadius(28)
-            .padding(16)
-            .margin({ bottom: 40 })
+            })
           }
           .width('100%')
           .alignItems(HorizontalAlign.Center)
@@ -404,9 +331,8 @@ struct StudyRoom {
         .backgroundColor('rgba(0,0,0,0)')
         .scrollBar(BarState.Off)
         .width('100%')
-        .layoutWeight(1)  // ✅ 关键修改：替代原来的 height('100%')，配合父 Column 分配剩余空间
+        .layoutWeight(1)
 
-        // 底部信息栏
         Row() {
           Text(this.currentTime)
             .fontSize(13)
