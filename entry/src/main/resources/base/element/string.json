@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "沉浸式自习室"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "专注学习空间"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "自习室"
+    }
+  ]
+}
