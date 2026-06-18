@@ -2,6 +2,7 @@ export interface TodoItem {
   id: number;
   text: string;
   completed: boolean;
+  pinned: boolean;
 }
 
 export interface SceneData {

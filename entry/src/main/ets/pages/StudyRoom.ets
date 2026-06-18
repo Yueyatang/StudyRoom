@@ -70,6 +70,7 @@ struct StudyRoom {
   @State sceneInfoScale: number = 1;
   @State musicEnabled: boolean = true;
   @State soundEnabled: boolean = true;
+  @State showCompletedTodos: boolean = false;
 
   private timerId: number = -1;
   private clockId: number = -1;
@@ -489,7 +490,8 @@ struct StudyRoom {
             const normalizedItem: TodoItem = {
               id: item.id ?? Date.now() + index,
               text: item.text,
-              completed: item.completed
+              completed: item.completed,
+              pinned: item.pinned ?? false
             };
             normalizedTodoList.push(normalizedItem);
           });
@@ -505,9 +507,9 @@ struct StudyRoom {
 
   async initDefaultTodos() {
     this.todoList = [
-      { id: 1, text: '学习鸿蒙', completed: false },
-      { id: 2, text: '开发应用', completed: false },
-      { id: 3, text: '数据库', completed: false }
+      { id: 1, text: '????', completed: false, pinned: true },
+      { id: 2, text: '????', completed: false, pinned: false },
+      { id: 3, text: '???', completed: false, pinned: false }
     ];
     await this.saveStudyData();
   }
@@ -538,12 +540,12 @@ struct StudyRoom {
 
   getModeLabel(mode: TimerMode): string {
     if (mode === 'focus') {
-      return '专注';
+      return '??';
     }
     if (mode === 'shortBreak') {
-      return '短休息';
+      return '???';
     }
-    return '长休息';
+    return '???';
   }
 
   applyCurrentModeDuration() {
@@ -568,7 +570,7 @@ struct StudyRoom {
       const nextMode: TimerMode = this.completedFocusSessions % 4 === 0 ? 'longBreak' : 'shortBreak';
       this.switchMode(nextMode, true);
       promptAction.showToast({
-        message: `专注完成，接下来进入${this.getModeLabel(nextMode)}`,
+        message: `??????????${this.getModeLabel(nextMode)}`,
         duration: 2000
       });
       return;
@@ -576,7 +578,7 @@ struct StudyRoom {
 
     this.switchMode('focus', true);
     promptAction.showToast({
-      message: '休息结束，回到专注状态',
+      message: '???????????',
       duration: 2000
     });
   }
@@ -687,7 +689,27 @@ struct StudyRoom {
       const nextItem: TodoItem = {
         id: item.id,
         text: item.text,
-        completed: itemIndex === index ? !item.completed : item.completed
+        completed: itemIndex === index ? !item.completed : item.completed,
+        pinned: item.pinned
+      };
+      nextTodoList.push(nextItem);
+    });
+    this.todoList = nextTodoList;
+    void this.saveStudyData();
+  }
+
+  toggleCompletedSection() {
+    this.showCompletedTodos = !this.showCompletedTodos;
+  }
+
+  pinTodo(index: number) {
+    const nextTodoList: TodoItem[] = [];
+    this.todoList.forEach((item: TodoItem, itemIndex: number) => {
+      const nextItem: TodoItem = {
+        id: item.id,
+        text: item.text,
+        completed: item.completed,
+        pinned: itemIndex === index ? !item.pinned : item.pinned
       };
       nextTodoList.push(nextItem);
     });
@@ -707,7 +729,8 @@ struct StudyRoom {
     const newTodo: TodoItem = {
       id: Date.now(),
       text: trimmedText,
-      completed: false
+      completed: false,
+      pinned: false
     };
     nextTodoList.push(newTodo);
     this.todoList = nextTodoList;
@@ -870,6 +893,7 @@ struct StudyRoom {
             TodoComponent({
               todoList: this.todoList,
               newTodoText: this.newTodoText,
+              showCompleted: this.showCompletedTodos,
               onToggle: (index: number) => {
                 this.toggleTodo(index);
               },
@@ -881,6 +905,12 @@ struct StudyRoom {
               },
               onAdd: () => {
                 this.addTodo();
+              },
+              onToggleCompletedSection: () => {
+                this.toggleCompletedSection();
+              },
+              onPin: (index: number) => {
+                this.pinTodo(index);
               }
             })
           }
