@@ -1,5 +1,6 @@
 import promptAction from '@ohos.promptAction';
 import media from '@ohos.multimedia.media';
+import preferences from '@ohos.data.preferences';
 import { SceneSelector } from '../components/SceneSelector';
 import { TimerComponent } from '../components/TimerComponent';
 import { TodoComponent } from '../components/TodoComponent';
@@ -63,7 +64,7 @@ struct StudyRoom {
   @State shortBreakDuration: number = 5 * 60;
   @State longBreakDuration: number = 15 * 60;
   @State completedFocusSessions: number = 0;
-  @State totalFocusMinutes: number = 0;
+  @State totalFocusSeconds: number = 0;
   @State currentSessionTotalSeconds: number = 25 * 60;
   @State backgroundOverlayOpacity: number = 0.28;
   @State sceneInfoScale: number = 1;
@@ -78,12 +79,21 @@ struct StudyRoom {
   private isPreparingMusic: boolean = false;
   private musicPlayerState: media.AVPlayerState = 'idle';
   private musicPreparingTarget: string = '';
+  private soundPlayer: media.AVPlayer | null = null;
+  private soundRawFd: media.AVFileDescriptor | null = null;
+  private activeSoundName: string = '';
+  private isPreparingSound: boolean = false;
+  private soundPlayerState: media.AVPlayerState = 'idle';
+  private soundPreparingTarget: string = '';
+  private studyRoomPreferences: preferences.Preferences | null = null;
+  private readonly preferencesName: string = 'study_room_preferences';
 
-  aboutToAppear() {
-    this.loadData();
+  async aboutToAppear() {
+    await this.loadData();
     this.applyCurrentModeDuration();
     this.startClock();
     this.initMusicPlayer();
+    this.initSoundPlayer();
   }
 
   async aboutToDisappear() {
@@ -94,6 +104,7 @@ struct StudyRoom {
       clearInterval(this.clockId);
     }
     await this.releaseMusicPlayer();
+    await this.releaseSoundPlayer();
   }
 
   getCurrentScene(): SceneData {
@@ -203,6 +214,134 @@ struct StudyRoom {
     }
   }
 
+  async initSoundPlayer() {
+    try {
+      this.soundPlayer = await media.createAVPlayer();
+      this.soundPlayer.loop = true;
+      this.soundPlayer.on('stateChange', (state: media.AVPlayerState) => {
+        this.soundPlayerState = state;
+        console.info(`[StudyRoomSound] stateChange -> ${state}`);
+      });
+      this.soundPlayer.on('error', (error) => {
+        console.error(`[StudyRoomSound] player error: ${JSON.stringify(error)}`);
+      });
+      await this.updateSceneSound();
+    } catch (error) {
+      console.error(`[StudyRoomSound] init failed: ${JSON.stringify(error)}`);
+    }
+  }
+
+  async releaseSoundPlayer() {
+    await this.closeSoundRawFd();
+    if (this.soundPlayer !== null) {
+      try {
+        await this.soundPlayer.release();
+      } catch (error) {
+        console.error(`[StudyRoomSound] release failed: ${JSON.stringify(error)}`);
+      }
+      this.soundPlayer = null;
+      this.soundPlayerState = 'released';
+    }
+  }
+
+  async closeSoundRawFd() {
+    if (this.soundRawFd === null) {
+      return;
+    }
+    try {
+      getContext(this).resourceManager.closeRawFileDescriptor(this.activeSoundName);
+    } catch (error) {
+      console.error(`[StudyRoomSound] close raw fd skipped: ${JSON.stringify(error)}`);
+    }
+    this.soundRawFd = null;
+  }
+
+  async waitForSoundState(expectedState: media.AVPlayerState, timeoutMs: number = 2500) {
+    const startTime = Date.now();
+    while (this.soundPlayerState !== expectedState) {
+      if (Date.now() - startTime > timeoutMs) {
+        throw new Error(`wait state timeout, expected=${expectedState}, current=${this.soundPlayerState}`);
+      }
+      await new Promise<void>((resolve) => {
+        setTimeout(() => resolve(), 80);
+      });
+    }
+  }
+
+  async stopSoundPlayback() {
+    if (this.soundPlayer === null) {
+      return;
+    }
+
+    if (this.soundPlayerState === 'playing' || this.soundPlayerState === 'paused' || this.soundPlayerState === 'completed') {
+      try {
+        await this.soundPlayer.stop();
+      } catch (error) {
+        console.error(`[StudyRoomSound] stop skipped: ${JSON.stringify(error)}`);
+      }
+    }
+
+    if (this.soundPlayerState === 'initialized' ||
+      this.soundPlayerState === 'prepared' ||
+      this.soundPlayerState === 'playing' ||
+      this.soundPlayerState === 'paused' ||
+      this.soundPlayerState === 'completed' ||
+      this.soundPlayerState === 'stopped' ||
+      this.soundPlayerState === 'error') {
+      try {
+        await this.soundPlayer.reset();
+      } catch (error) {
+        console.error(`[StudyRoomSound] reset skipped: ${JSON.stringify(error)}`);
+      }
+    }
+  }
+
+  async updateSceneSound() {
+    if (!this.soundEnabled || this.soundPlayer === null || this.isPreparingSound) {
+      return;
+    }
+
+    const targetSound = this.getCurrentScene().soundName;
+    if (this.activeSoundName === targetSound) {
+      return;
+    }
+
+    this.isPreparingSound = true;
+    this.soundPreparingTarget = targetSound;
+    try {
+      console.info(`[StudyRoomSound] update start target=${targetSound} currentState=${this.soundPlayerState}`);
+      await this.stopSoundPlayback();
+      await this.closeSoundRawFd();
+      const rawFd = await getContext(this).resourceManager.getRawFd(targetSound);
+      console.info(`[StudyRoomSound] raw fd loaded target=${targetSound} fd=${rawFd.fd} offset=${rawFd.offset} length=${rawFd.length}`);
+      this.soundRawFd = {
+        fd: rawFd.fd,
+        offset: rawFd.offset,
+        length: rawFd.length
+      };
+      this.soundPlayer.fdSrc = this.soundRawFd;
+      console.info(`[StudyRoomSound] fdSrc assigned target=${targetSound} state=${this.soundPlayerState}`);
+      await this.waitForSoundState('initialized');
+      console.info(`[StudyRoomSound] preparing target=${targetSound}`);
+      await this.soundPlayer.prepare();
+      await this.waitForSoundState('prepared');
+      console.info(`[StudyRoomSound] playing target=${targetSound}`);
+      await this.soundPlayer.play();
+      await this.waitForSoundState('playing');
+      this.activeSoundName = targetSound;
+      console.info(`[StudyRoomSound] update success target=${targetSound}`);
+    } catch (error) {
+      console.error(`[StudyRoomSound] update failed target=${targetSound} state=${this.soundPlayerState} error=${JSON.stringify(error)}`);
+      promptAction.showToast({
+        message: '环境音加载失败，请检查音频资源',
+        duration: 1200
+      });
+    } finally {
+      this.isPreparingSound = false;
+      this.soundPreparingTarget = '';
+    }
+  }
+
   async updateSceneMusic() {
     if (!this.musicEnabled || this.musicPlayer === null || this.isPreparingMusic) {
       return;
@@ -269,10 +408,22 @@ struct StudyRoom {
     });
   }
 
-  toggleSound() {
+  async toggleSound() {
     this.soundEnabled = !this.soundEnabled;
+    if (this.soundEnabled) {
+      this.activeSoundName = '';
+      await this.updateSceneSound();
+      promptAction.showToast({
+        message: '已开启环境音效',
+        duration: 1200
+      });
+      return;
+    }
+
+    this.activeSoundName = '';
+    await this.stopSoundPlayback();
     promptAction.showToast({
-      message: this.soundEnabled ? '已开启环境音效' : '已关闭环境音效',
+      message: '已关闭环境音效',
       duration: 1200
     });
   }
@@ -292,39 +443,87 @@ struct StudyRoom {
     this.currentTime = `${hours}:${minutes}:${seconds}`;
   }
 
-  loadData() {
+  getTodayKey(): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = `${now.getMonth() + 1}`.padStart(2, '0');
+    const day = `${now.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  async ensurePreferences() {
+    if (this.studyRoomPreferences !== null) {
+      return this.studyRoomPreferences;
+    }
+    this.studyRoomPreferences = await preferences.getPreferences(getContext(this), this.preferencesName);
+    return this.studyRoomPreferences;
+  }
+
+  async loadData() {
     try {
-      const savedTomato = AppStorage.get<number>('tomatoCount');
-      if (savedTomato !== undefined) {
-        this.tomatoCount = savedTomato;
+      const store = await this.ensurePreferences();
+      const todayKey = this.getTodayKey();
+      const savedDate = (await store.get('statsDate', '')) as string;
+
+      if (savedDate === todayKey) {
+        this.tomatoCount = Number((await store.get('tomatoCount', 0)) as number);
+        this.completedFocusSessions = Number((await store.get('completedFocusSessions', 0)) as number);
+        this.totalFocusSeconds = Number((await store.get('totalFocusSeconds', 0)) as number);
+      } else {
+        this.tomatoCount = 0;
+        this.completedFocusSessions = 0;
+        this.totalFocusSeconds = 0;
+        await store.put('statsDate', todayKey);
+        await store.put('tomatoCount', 0);
+        await store.put('completedFocusSessions', 0);
+        await store.put('totalFocusSeconds', 0);
+        await store.flush();
       }
 
-      const savedTodos = AppStorage.get<string>('todoList');
+      const savedTodos = (await store.get('todoList', '')) as string;
       if (savedTodos !== undefined && savedTodos !== '') {
         const parsed: TodoItem[] = JSON.parse(savedTodos);
         if (Array.isArray(parsed)) {
-          this.todoList = parsed;
+          const normalizedTodoList: TodoItem[] = [];
+          parsed.forEach((item: TodoItem, index: number) => {
+            const normalizedItem: TodoItem = {
+              id: item.id ?? Date.now() + index,
+              text: item.text,
+              completed: item.completed
+            };
+            normalizedTodoList.push(normalizedItem);
+          });
+          this.todoList = normalizedTodoList;
           return;
         }
       }
-      this.initDefaultTodos();
+      await this.initDefaultTodos();
     } catch (e) {
-      this.initDefaultTodos();
+      await this.initDefaultTodos();
     }
   }
 
-  initDefaultTodos() {
+  async initDefaultTodos() {
     this.todoList = [
-      { text: '深度阅读 30 分钟', completed: false },
-      { text: '复习笔记 2 章', completed: false },
-      { text: '整理项目计划', completed: false }
+      { id: 1, text: '学习鸿蒙', completed: false },
+      { id: 2, text: '开发应用', completed: false },
+      { id: 3, text: '数据库', completed: false }
     ];
-    this.saveTodos();
+    await this.saveStudyData();
   }
 
-  saveTodos() {
-    AppStorage.setOrCreate('todoList', JSON.stringify(this.todoList));
-    AppStorage.setOrCreate('tomatoCount', this.tomatoCount);
+  async saveStudyData() {
+    try {
+      const store = await this.ensurePreferences();
+      await store.put('statsDate', this.getTodayKey());
+      await store.put('todoList', JSON.stringify(this.todoList));
+      await store.put('tomatoCount', this.tomatoCount);
+      await store.put('completedFocusSessions', this.completedFocusSessions);
+      await store.put('totalFocusSeconds', this.totalFocusSeconds);
+      await store.flush();
+    } catch (error) {
+      console.error(`save study data failed: ${JSON.stringify(error)}`);
+    }
   }
 
   getDurationForMode(mode: TimerMode): number {
@@ -357,10 +556,6 @@ struct StudyRoom {
     const mins = Math.floor(this.totalSeconds / 60);
     const secs = this.totalSeconds % 60;
     this.timerDisplay = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-
-    if (this.totalSeconds === 0 && this.isRunning) {
-      this.completeCurrentSession();
-    }
   }
 
   completeCurrentSession() {
@@ -368,8 +563,7 @@ struct StudyRoom {
     if (this.currentMode === 'focus') {
       this.tomatoCount = this.tomatoCount + 1;
       this.completedFocusSessions = this.completedFocusSessions + 1;
-      this.totalFocusMinutes = this.totalFocusMinutes + Math.floor(this.currentSessionTotalSeconds / 60);
-      this.saveTodos();
+      void this.saveStudyData();
 
       const nextMode: TimerMode = this.completedFocusSessions % 4 === 0 ? 'longBreak' : 'shortBreak';
       this.switchMode(nextMode, true);
@@ -382,7 +576,7 @@ struct StudyRoom {
 
     this.switchMode('focus', true);
     promptAction.showToast({
-      message: '休息结束，回到专注',
+      message: '休息结束，回到专注状态',
       duration: 2000
     });
   }
@@ -398,7 +592,13 @@ struct StudyRoom {
     this.timerId = setInterval(() => {
       if (this.totalSeconds > 0 && this.isRunning) {
         this.totalSeconds = this.totalSeconds - 1;
+        if (this.currentMode === 'focus') {
+          this.totalFocusSeconds = this.totalFocusSeconds + 1;
+        }
         this.updateTimerDisplay();
+        if (this.totalSeconds === 0) {
+          this.completeCurrentSession();
+        }
       }
     }, 1000);
   }
@@ -476,29 +676,54 @@ struct StudyRoom {
       this.sceneInfoScale = 1;
     });
     this.activeMusicName = '';
+    this.activeSoundName = '';
     await this.updateSceneMusic();
+    await this.updateSceneSound();
   }
 
   toggleTodo(index: number) {
-    this.todoList[index].completed = !this.todoList[index].completed;
-    this.saveTodos();
+    const nextTodoList: TodoItem[] = [];
+    this.todoList.forEach((item: TodoItem, itemIndex: number) => {
+      const nextItem: TodoItem = {
+        id: item.id,
+        text: item.text,
+        completed: itemIndex === index ? !item.completed : item.completed
+      };
+      nextTodoList.push(nextItem);
+    });
+    this.todoList = nextTodoList;
+    void this.saveStudyData();
   }
 
   addTodo() {
-    if (this.newTodoText.trim() === '') {
+    const trimmedText = this.newTodoText.trim();
+    if (trimmedText === '') {
       return;
     }
-    this.todoList.push({
-      text: this.newTodoText,
-      completed: false
+    const nextTodoList: TodoItem[] = [];
+    this.todoList.forEach((item: TodoItem) => {
+      nextTodoList.push(item);
     });
+    const newTodo: TodoItem = {
+      id: Date.now(),
+      text: trimmedText,
+      completed: false
+    };
+    nextTodoList.push(newTodo);
+    this.todoList = nextTodoList;
     this.newTodoText = '';
-    this.saveTodos();
+    void this.saveStudyData();
   }
 
   deleteTodo(index: number) {
-    this.todoList.splice(index, 1);
-    this.saveTodos();
+    const nextTodoList: TodoItem[] = [];
+    this.todoList.forEach((item: TodoItem, itemIndex: number) => {
+      if (itemIndex !== index) {
+        nextTodoList.push(item);
+      }
+    });
+    this.todoList = nextTodoList;
+    void this.saveStudyData();
   }
 
   build() {
@@ -608,7 +833,7 @@ struct StudyRoom {
               currentMode: this.currentMode,
               isRunning: this.isRunning,
               completedFocusSessions: this.completedFocusSessions,
-              totalFocusMinutes: this.totalFocusMinutes,
+              totalFocusSeconds: this.totalFocusSeconds,
               onStart: () => {
                 this.startTimer();
               },

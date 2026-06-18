@@ -6,7 +6,7 @@ export struct TimerComponent {
   @Prop currentMode: TimerMode = 'focus';
   @Prop isRunning: boolean = false;
   @Prop completedFocusSessions: number = 0;
-  @Prop totalFocusMinutes: number = 0;
+  @Prop totalFocusSeconds: number = 0;
   onStart: () => void = () => {};
   onPause: () => void = () => {};
   onReset: () => void = () => {};
@@ -27,63 +27,112 @@ export struct TimerComponent {
 
   getModeHint(): string {
     if (this.currentMode === 'focus') {
-      return this.isRunning ? '保持专注中' : '准备开始专注';
+      return this.isRunning ? '保持节奏，先专注这一轮。' : '整理思绪，准备进入专注状态。';
     }
     if (this.currentMode === 'shortBreak') {
-      return this.isRunning ? '短暂放松中' : '短休息准备';
+      return this.isRunning ? '短暂放松一下，给大脑留出缓冲。' : '短休息即将开始，记得活动肩颈。';
     }
-    return this.isRunning ? '长休息中' : '长休息准备';
+    return this.isRunning ? '长休息进行中，慢慢恢复能量。' : '完成阶段冲刺后，给自己一次完整休息。';
+  }
+
+  getFocusDurationLabel(): string {
+    return `${Math.floor(this.totalFocusSeconds / 60)} 分钟`;
   }
 
   build() {
     Column() {
       Row() {
+        Column() {
+          Text('番茄钟')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#FFFFFF')
+
+          Text(this.getModeHint())
+            .fontSize(12)
+            .fontColor('rgba(234,239,244,0.76)')
+            .margin({ top: 6 })
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+
+        Text(this.getModeLabel(this.currentMode))
+          .fontSize(12)
+          .fontWeight(FontWeight.Medium)
+          .fontColor('#FFE2A8')
+          .padding({ left: 12, right: 12, top: 6, bottom: 6 })
+          .backgroundColor('rgba(255,216,120,0.16)')
+          .borderRadius(16)
+      }
+      .width('100%')
+      .margin({ bottom: 14 })
+
+      Row() {
         ForEach(this.modes, (mode: TimerMode) => {
           Button(this.getModeLabel(mode))
             .fontSize(12)
-            .fontColor(this.currentMode === mode ? '#FFD878' : '#FFFFFF')
-            .height(34)
+            .fontWeight(this.currentMode === mode ? FontWeight.Medium : FontWeight.Regular)
+            .fontColor(this.currentMode === mode ? '#1D2430' : '#F4F7FA')
+            .height(38)
             .layoutWeight(1)
-            .backgroundColor(this.currentMode === mode ? 'rgba(255,216,120,0.25)' : 'rgba(255,255,255,0.10)')
-            .borderRadius(18)
+            .backgroundColor(this.currentMode === mode ? '#FFD878' : 'rgba(255,255,255,0.10)')
+            .borderRadius(20)
             .onClick(() => {
               this.onSelectMode(mode);
             })
         })
       }
       .width('100%')
-      .margin({ bottom: 12 })
+      .margin({ bottom: 16 })
 
-      Text(this.getModeHint())
-        .fontSize(13)
-        .fontColor('#DADADA')
-        .margin({ bottom: 8 })
+      Stack({ alignContent: Alignment.Center }) {
+        Column() {
+          Text('当前计时')
+            .fontSize(12)
+            .fontColor('rgba(237,242,248,0.72)')
+            .margin({ bottom: 10 })
 
-      Text(this.timerDisplay)
-        .fontSize(56)
-        .fontWeight(FontWeight.Bold)
-        .fontColor('#FFFFFF')
-        .fontFamily('monospace')
-        .letterSpacing(6)
-        .margin({ top: 12, bottom: 12 })
+          Text(this.timerDisplay)
+            .fontSize(54)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#FFFFFF')
+            .fontFamily('monospace')
+            .letterSpacing(4)
+        }
+        .width('100%')
+        .padding({ top: 28, bottom: 28 })
+        .linearGradient({
+          angle: 135,
+          colors: [
+            ['rgba(255,255,255,0.14)', 0],
+            ['rgba(116,132,210,0.30)', 1]
+          ]
+        })
+        .borderRadius(26)
+      }
+      .width('100%')
+      .margin({ bottom: 16 })
 
       Row() {
-        Button(this.isRunning ? '运行中' : '开始')
+        Button(this.isRunning ? '进行中' : '开始专注')
           .fontSize(14)
-          .height(38)
-          .padding({ left: 20, right: 20 })
-          .backgroundColor('rgba(100,120,200,0.8)')
-          .borderRadius(38)
+          .fontWeight(FontWeight.Medium)
+          .fontColor('#162030')
+          .height(42)
+          .layoutWeight(1.3)
+          .backgroundColor('#F6D08C')
+          .borderRadius(21)
           .onClick(() => {
             this.onStart();
           })
 
         Button('暂停')
           .fontSize(14)
-          .height(38)
-          .padding({ left: 20, right: 20 })
-          .backgroundColor('rgba(60,60,80,0.8)')
-          .borderRadius(38)
+          .fontColor('#F3F6FA')
+          .height(42)
+          .layoutWeight(1)
+          .backgroundColor('rgba(255,255,255,0.12)')
+          .borderRadius(21)
           .margin({ left: 10 })
           .onClick(() => {
             this.onPause();
@@ -91,73 +140,96 @@ export struct TimerComponent {
 
         Button('重置')
           .fontSize(14)
-          .height(38)
-          .padding({ left: 20, right: 20 })
-          .backgroundColor('rgba(60,60,80,0.8)')
-          .borderRadius(38)
+          .fontColor('#F3F6FA')
+          .height(42)
+          .layoutWeight(1)
+          .backgroundColor('rgba(255,255,255,0.12)')
+          .borderRadius(21)
           .margin({ left: 10 })
           .onClick(() => {
             this.onReset();
           })
       }
+      .width('100%')
 
       Row() {
-        Button('-5')
+        Text('时长微调')
           .fontSize(12)
+          .fontColor('rgba(228,233,239,0.72)')
+
+        Blank()
+
+        Button('-5 分钟')
+          .fontSize(12)
+          .fontColor('#EAF0F6')
           .height(34)
-          .backgroundColor('rgba(45,50,65,0.8)')
-          .borderRadius(34)
-          .layoutWeight(1)
+          .padding({ left: 14, right: 14 })
+          .backgroundColor('rgba(255,255,255,0.10)')
+          .borderRadius(17)
           .onClick(() => {
             this.onAdjustMinutes(-5);
           })
 
-        Button('+5')
+        Button('+5 分钟')
           .fontSize(12)
+          .fontColor('#EAF0F6')
           .height(34)
-          .backgroundColor('rgba(45,50,65,0.8)')
-          .borderRadius(34)
-          .layoutWeight(1)
-          .margin({ left: 12 })
+          .padding({ left: 14, right: 14 })
+          .backgroundColor('rgba(255,255,255,0.10)')
+          .borderRadius(17)
+          .margin({ left: 8 })
           .onClick(() => {
             this.onAdjustMinutes(5);
           })
       }
       .width('100%')
-      .margin({ top: 10, bottom: 10 })
+      .margin({ top: 14, bottom: 14 })
 
       Row() {
         Column() {
-          Text('专注轮次')
+          Text('完成轮次')
             .fontSize(11)
-            .fontColor('#B8B8B8')
+            .fontColor('rgba(225,231,237,0.68)')
           Text(`${this.completedFocusSessions}`)
-            .fontSize(18)
+            .fontSize(24)
             .fontWeight(FontWeight.Bold)
             .fontColor('#FFFFFF')
+            .margin({ top: 6 })
+        }
+        .layoutWeight(1.1)
+        .alignItems(HorizontalAlign.Start)
+        .padding(14)
+        .backgroundColor('rgba(255,255,255,0.08)')
+        .borderRadius(20)
+
+        Column() {
+          Text('累计专注')
+            .fontSize(11)
+            .fontColor('rgba(225,231,237,0.68)')
+          Text(this.getFocusDurationLabel())
+            .fontSize(20)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#FFFFFF')
+            .margin({ top: 6 })
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
-
-        Column() {
-          Text('今日专注')
-            .fontSize(11)
-            .fontColor('#B8B8B8')
-          Text(`${this.totalFocusMinutes} min`)
-            .fontSize(18)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#FFFFFF')
-        }
-        .layoutWeight(1)
-        .alignItems(HorizontalAlign.End)
+        .padding(14)
+        .backgroundColor('rgba(255,255,255,0.08)')
+        .borderRadius(20)
+        .margin({ left: 10 })
       }
       .width('100%')
-      .margin({ top: 4 })
+      .margin({ top: 2 })
     }
     .width('90%')
-    .backgroundColor('rgba(30,34,48,0.6)')
-    .borderRadius(28)
-    .padding(16)
-    .margin({ bottom: 16 })
+    .backgroundColor('rgba(22,28,38,0.64)')
+    .borderRadius(30)
+    .padding({ left: 18, right: 18, top: 18, bottom: 18 })
+    .border({
+      width: 1,
+      color: 'rgba(255,255,255,0.08)'
+    })
+    .margin({ bottom: 18 })
   }
 }
