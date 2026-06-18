@@ -1,4 +1,5 @@
 import promptAction from '@ohos.promptAction';
+import media from '@ohos.multimedia.media';
 import { SceneSelector } from '../components/SceneSelector';
 import { TimerComponent } from '../components/TimerComponent';
 import { TodoComponent } from '../components/TodoComponent';
@@ -8,9 +9,45 @@ import { SceneData, TimerMode, TodoItem } from '../common/StudyRoomTypes';
 @Component
 struct StudyRoom {
   @State scenes: SceneData[] = [
-    { name: '森林秘境', bgColor: '#2D5A3B', atmosphere: '松风轻语 · 清新氧气', quote: '静听松风，心如止水' },
-    { name: '海岸潮汐', bgColor: '#2A6B7C', atmosphere: '浪花白噪音 · 无垠海蓝', quote: '潮汐相伴，沉浸于知识海洋' },
-    { name: '城市夜景', bgColor: '#2C2E3E', atmosphere: '霓虹灯火 · 都市脉搏', quote: '万家灯火时，正是精进时' }
+    {
+      name: '森林秘境',
+      bgColor: '#2D5A3B',
+      accentColor: 'rgba(94, 164, 112, 0.45)',
+      atmosphere: '松风轻语，空气清润，适合安静沉浸。',
+      quote: '静听松风，心如止水。',
+      suggestion: '深度阅读',
+      musicLabel: '森林沉浸音乐',
+      soundLabel: '鸟鸣环境音',
+      imageName: 'forest2.jpg',
+      musicName: 'forest_music.mp3',
+      soundName: 'forest_bird_sound.wav'
+    },
+    {
+      name: '海岸潮汐',
+      bgColor: '#2A6B7C',
+      accentColor: 'rgba(72, 153, 181, 0.45)',
+      atmosphere: '浪声有节律，能帮你把注意力拉回当下。',
+      quote: '潮汐相伴，沉浸于知识海洋。',
+      suggestion: '背诵记忆',
+      musicLabel: '海边沉浸音乐',
+      soundLabel: '海浪环境音',
+      imageName: 'sea1.jpg',
+      musicName: 'sea_music1.mp3',
+      soundName: 'sea_sound.wav'
+    },
+    {
+      name: '城市夜景',
+      bgColor: '#2C2E3E',
+      accentColor: 'rgba(116, 126, 196, 0.40)',
+      atmosphere: '夜色安静克制，适合进入稳定高效的节奏。',
+      quote: '万家灯火时，正是精进时。',
+      suggestion: '写作输出',
+      musicLabel: '城市夜曲',
+      soundLabel: '车流环境音',
+      imageName: 'night_city2.jpg',
+      musicName: 'city_music.mp3',
+      soundName: 'city_sound.wav'
+    }
   ];
 
   @State currentSceneIndex: number = 0;
@@ -28,23 +65,216 @@ struct StudyRoom {
   @State completedFocusSessions: number = 0;
   @State totalFocusMinutes: number = 0;
   @State currentSessionTotalSeconds: number = 25 * 60;
+  @State backgroundOverlayOpacity: number = 0.28;
+  @State sceneInfoScale: number = 1;
+  @State musicEnabled: boolean = true;
+  @State soundEnabled: boolean = true;
 
   private timerId: number = -1;
   private clockId: number = -1;
+  private musicPlayer: media.AVPlayer | null = null;
+  private musicRawFd: media.AVFileDescriptor | null = null;
+  private activeMusicName: string = '';
+  private isPreparingMusic: boolean = false;
+  private musicPlayerState: media.AVPlayerState = 'idle';
+  private musicPreparingTarget: string = '';
 
   aboutToAppear() {
     this.loadData();
     this.applyCurrentModeDuration();
     this.startClock();
+    this.initMusicPlayer();
   }
 
-  aboutToDisappear() {
+  async aboutToDisappear() {
     if (this.timerId !== -1) {
       clearInterval(this.timerId);
     }
     if (this.clockId !== -1) {
       clearInterval(this.clockId);
     }
+    await this.releaseMusicPlayer();
+  }
+
+  getCurrentScene(): SceneData {
+    return this.scenes[this.currentSceneIndex];
+  }
+
+  getSceneBackground(): Resource {
+    switch (this.getCurrentScene().imageName) {
+      case 'forest2.jpg':
+        return $r('app.media.forest2');
+      case 'sea1.jpg':
+        return $r('app.media.sea1');
+      case 'night_city2.jpg':
+        return $r('app.media.night_city2');
+      default:
+        return $r('app.media.background');
+    }
+  }
+
+  getMusicStatusText(): string {
+    return this.musicEnabled ? this.getCurrentScene().musicLabel : '沉浸音乐已关闭';
+  }
+
+  getSoundStatusText(): string {
+    return this.soundEnabled ? this.getCurrentScene().soundLabel : '环境音效已关闭';
+  }
+
+  async initMusicPlayer() {
+    try {
+      this.musicPlayer = await media.createAVPlayer();
+      this.musicPlayer.loop = true;
+      this.musicPlayer.on('stateChange', (state: media.AVPlayerState) => {
+        this.musicPlayerState = state;
+        console.info(`[StudyRoomMusic] stateChange -> ${state}`);
+      });
+      this.musicPlayer.on('error', (error) => {
+        console.error(`[StudyRoomMusic] player error: ${JSON.stringify(error)}`);
+      });
+      await this.updateSceneMusic();
+    } catch (error) {
+      console.error(`[StudyRoomMusic] init failed: ${JSON.stringify(error)}`);
+    }
+  }
+
+  async releaseMusicPlayer() {
+    await this.closeMusicRawFd();
+    if (this.musicPlayer !== null) {
+      try {
+        await this.musicPlayer.release();
+      } catch (error) {
+        console.error(`[StudyRoomMusic] release failed: ${JSON.stringify(error)}`);
+      }
+      this.musicPlayer = null;
+      this.musicPlayerState = 'released';
+    }
+  }
+
+  async closeMusicRawFd() {
+    if (this.musicRawFd === null) {
+      return;
+    }
+    try {
+      getContext(this).resourceManager.closeRawFileDescriptor(this.activeMusicName);
+    } catch (error) {
+      console.error(`[StudyRoomMusic] close raw fd skipped: ${JSON.stringify(error)}`);
+    }
+    this.musicRawFd = null;
+  }
+
+  async waitForMusicState(expectedState: media.AVPlayerState, timeoutMs: number = 2500) {
+    const startTime = Date.now();
+    while (this.musicPlayerState !== expectedState) {
+      if (Date.now() - startTime > timeoutMs) {
+        throw new Error(`wait state timeout, expected=${expectedState}, current=${this.musicPlayerState}`);
+      }
+      await new Promise<void>((resolve) => {
+        setTimeout(() => resolve(), 80);
+      });
+    }
+  }
+
+  async stopMusicPlayback() {
+    if (this.musicPlayer === null) {
+      return;
+    }
+
+    if (this.musicPlayerState === 'playing' || this.musicPlayerState === 'paused' || this.musicPlayerState === 'completed') {
+      try {
+        await this.musicPlayer.stop();
+      } catch (error) {
+        console.error(`[StudyRoomMusic] stop skipped: ${JSON.stringify(error)}`);
+      }
+    }
+
+    if (this.musicPlayerState === 'initialized' ||
+      this.musicPlayerState === 'prepared' ||
+      this.musicPlayerState === 'playing' ||
+      this.musicPlayerState === 'paused' ||
+      this.musicPlayerState === 'completed' ||
+      this.musicPlayerState === 'stopped' ||
+      this.musicPlayerState === 'error') {
+      try {
+        await this.musicPlayer.reset();
+      } catch (error) {
+        console.error(`[StudyRoomMusic] reset skipped: ${JSON.stringify(error)}`);
+      }
+    }
+  }
+
+  async updateSceneMusic() {
+    if (!this.musicEnabled || this.musicPlayer === null || this.isPreparingMusic) {
+      return;
+    }
+
+    const targetMusic = this.getCurrentScene().musicName;
+    if (this.activeMusicName === targetMusic) {
+      return;
+    }
+
+    this.isPreparingMusic = true;
+    this.musicPreparingTarget = targetMusic;
+    try {
+      console.info(`[StudyRoomMusic] update start target=${targetMusic} currentState=${this.musicPlayerState}`);
+      await this.stopMusicPlayback();
+      await this.closeMusicRawFd();
+      const rawFd = await getContext(this).resourceManager.getRawFd(targetMusic);
+      console.info(`[StudyRoomMusic] raw fd loaded target=${targetMusic} fd=${rawFd.fd} offset=${rawFd.offset} length=${rawFd.length}`);
+      this.musicRawFd = {
+        fd: rawFd.fd,
+        offset: rawFd.offset,
+        length: rawFd.length
+      };
+      this.musicPlayer.fdSrc = this.musicRawFd;
+      console.info(`[StudyRoomMusic] fdSrc assigned target=${targetMusic} state=${this.musicPlayerState}`);
+      await this.waitForMusicState('initialized');
+      console.info(`[StudyRoomMusic] preparing target=${targetMusic}`);
+      await this.musicPlayer.prepare();
+      await this.waitForMusicState('prepared');
+      console.info(`[StudyRoomMusic] playing target=${targetMusic}`);
+      await this.musicPlayer.play();
+      await this.waitForMusicState('playing');
+      this.activeMusicName = targetMusic;
+      console.info(`[StudyRoomMusic] update success target=${targetMusic}`);
+    } catch (error) {
+      console.error(`[StudyRoomMusic] update failed target=${targetMusic} state=${this.musicPlayerState} error=${JSON.stringify(error)}`);
+      promptAction.showToast({
+        message: '音乐加载失败，请检查音频资源',
+        duration: 1200
+      });
+    } finally {
+      this.isPreparingMusic = false;
+      this.musicPreparingTarget = '';
+    }
+  }
+
+  async toggleMusic() {
+    this.musicEnabled = !this.musicEnabled;
+    if (this.musicEnabled) {
+      this.activeMusicName = '';
+      await this.updateSceneMusic();
+      promptAction.showToast({
+        message: '已开启沉浸音乐',
+        duration: 1200
+      });
+      return;
+    }
+
+    this.activeMusicName = '';
+    await this.stopMusicPlayback();
+    promptAction.showToast({
+      message: '已关闭沉浸音乐',
+      duration: 1200
+    });
+  }
+
+  toggleSound() {
+    this.soundEnabled = !this.soundEnabled;
+    promptAction.showToast({
+      message: this.soundEnabled ? '已开启环境音效' : '已关闭环境音效',
+      duration: 1200
+    });
   }
 
   startClock() {
@@ -109,12 +339,12 @@ struct StudyRoom {
 
   getModeLabel(mode: TimerMode): string {
     if (mode === 'focus') {
-      return 'Focus';
+      return '专注';
     }
     if (mode === 'shortBreak') {
-      return 'Short Break';
+      return '短休息';
     }
-    return 'Long Break';
+    return '长休息';
   }
 
   applyCurrentModeDuration() {
@@ -221,8 +451,32 @@ struct StudyRoom {
     }
   }
 
-  switchScene(index: number) {
-    this.currentSceneIndex = index;
+  randomScene() {
+    if (this.scenes.length <= 1) {
+      return;
+    }
+    let nextIndex = this.currentSceneIndex;
+    while (nextIndex === this.currentSceneIndex) {
+      nextIndex = Math.floor(Math.random() * this.scenes.length);
+    }
+    this.switchScene(nextIndex);
+  }
+
+  async switchScene(index: number) {
+    if (index < 0 || index >= this.scenes.length || index === this.currentSceneIndex) {
+      return;
+    }
+    animateTo({ duration: 260, curve: Curve.EaseInOut }, () => {
+      this.backgroundOverlayOpacity = 0.18;
+      this.sceneInfoScale = 0.98;
+      this.currentSceneIndex = index;
+    });
+    animateTo({ duration: 360, delay: 60, curve: Curve.EaseOut }, () => {
+      this.backgroundOverlayOpacity = 0.30;
+      this.sceneInfoScale = 1;
+    });
+    this.activeMusicName = '';
+    await this.updateSceneMusic();
   }
 
   toggleTodo(index: number) {
@@ -249,10 +503,27 @@ struct StudyRoom {
 
   build() {
     Stack() {
+      Image(this.getSceneBackground())
+        .width('100%')
+        .height('100%')
+        .objectFit(ImageFit.Cover)
+
       Column()
         .width('100%')
         .height('100%')
-        .backgroundColor(this.scenes[this.currentSceneIndex].bgColor)
+        .linearGradient({
+          angle: 135,
+          colors: [
+            ['rgba(11,14,20,0.08)', 0],
+            [this.getCurrentScene().bgColor, 0.55],
+            ['#161A24', 1]
+          ]
+        })
+
+      Column()
+        .width('100%')
+        .height('100%')
+        .backgroundColor(`rgba(8,12,20,${this.backgroundOverlayOpacity})`)
 
       Column() {
         Row()
@@ -266,8 +537,71 @@ struct StudyRoom {
               currentSceneIndex: this.currentSceneIndex,
               onSceneChange: (index: number) => {
                 this.switchScene(index);
+              },
+              onRandomScene: () => {
+                this.randomScene();
               }
             })
+
+            Row() {
+              Column() {
+                Text('沉浸音乐')
+                  .fontSize(12)
+                  .fontColor('#D5D9DE')
+                Text(this.getMusicStatusText())
+                  .fontSize(14)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor('#FFFFFF')
+                  .maxLines(1)
+                  .margin({ top: 6 })
+              }
+              .layoutWeight(1)
+              .alignItems(HorizontalAlign.Start)
+
+              Button(this.musicEnabled ? '关闭音乐' : '开启音乐')
+                .fontSize(12)
+                .height(34)
+                .backgroundColor('rgba(255,255,255,0.14)')
+                .borderRadius(17)
+                .onClick(() => {
+                  this.toggleMusic();
+                })
+            }
+            .width('90%')
+            .padding({ left: 16, right: 16, top: 14, bottom: 14 })
+            .backgroundColor('rgba(17,20,29,0.30)')
+            .borderRadius(24)
+            .margin({ bottom: 12 })
+
+            Row() {
+              Column() {
+                Text('环境音效')
+                  .fontSize(12)
+                  .fontColor('#D5D9DE')
+                Text(this.getSoundStatusText())
+                  .fontSize(14)
+                  .fontWeight(FontWeight.Medium)
+                  .fontColor('#FFFFFF')
+                  .maxLines(1)
+                  .margin({ top: 6 })
+              }
+              .layoutWeight(1)
+              .alignItems(HorizontalAlign.Start)
+
+              Button(this.soundEnabled ? '关闭音效' : '开启音效')
+                .fontSize(12)
+                .height(34)
+                .backgroundColor('rgba(255,255,255,0.14)')
+                .borderRadius(17)
+                .onClick(() => {
+                  this.toggleSound();
+                })
+            }
+            .width('90%')
+            .padding({ left: 16, right: 16, top: 14, bottom: 14 })
+            .backgroundColor('rgba(17,20,29,0.30)')
+            .borderRadius(24)
+            .margin({ bottom: 16 })
 
             TimerComponent({
               timerDisplay: this.timerDisplay,
@@ -326,6 +660,7 @@ struct StudyRoom {
             })
           }
           .width('100%')
+          .scale({ x: this.sceneInfoScale, y: this.sceneInfoScale })
           .alignItems(HorizontalAlign.Center)
         }
         .backgroundColor('rgba(0,0,0,0)')
@@ -343,7 +678,7 @@ struct StudyRoom {
 
           Blank()
 
-          Text(this.scenes[this.currentSceneIndex].quote)
+          Text(this.getCurrentScene().quote)
             .fontSize(11)
             .fontColor('#BBBBBB')
             .fontStyle(FontStyle.Italic)

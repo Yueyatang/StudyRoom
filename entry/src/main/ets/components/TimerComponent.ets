@@ -1,6 +1,5 @@
 import { TimerMode } from '../common/StudyRoomTypes';
 
-
 @Component
 export struct TimerComponent {
   @Prop timerDisplay: string = '25:00';
