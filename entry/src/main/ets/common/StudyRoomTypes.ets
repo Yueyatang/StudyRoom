@@ -5,6 +5,13 @@ export interface TodoItem {
   pinned: boolean;
 }
 
+export interface UserProfile {
+  nickname: string;
+  account: string;
+  signature: string;
+  targetTomatoes: number;
+}
+
 export interface SceneData {
   name: string;
   bgColor: string;
@@ -20,3 +27,4 @@ export interface SceneData {
 }
 
 export type TimerMode = 'focus' | 'shortBreak' | 'longBreak';
+export type AuthMode = 'login' | 'register';
