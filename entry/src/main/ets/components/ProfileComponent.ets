@@ -12,6 +12,7 @@ export struct ProfileComponent {
   @Prop totalTomatoCount: number = 0;
   @Prop todayTomatoCount: number = 0;
   @Prop totalFocusMinutes: number = 0;
+  @Prop statsVersion: number = 0;
 
   onNicknameChange: (value: string) => void = () => {};
   onSignatureChange: (value: string) => void = () => {};
@@ -22,6 +23,11 @@ export struct ProfileComponent {
   build() {
     Scroll() {
       Column({ space: 16 }) {
+        Text(`${this.statsVersion}`)
+          .width(0)
+          .height(0)
+          .opacity(0)
+
         Column({ space: 10 }) {
           Stack({ alignContent: Alignment.Center }) {
             Circle()

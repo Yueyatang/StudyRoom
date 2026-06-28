@@ -18,6 +18,7 @@ export struct CompanionComponent {
   @Prop continuousDays: number = 0;
   @Watch('onTomatoProgressChange') @Prop totalTomatoCount: number = 0;
   @Prop todayTomatoCount: number = 0;
+  @Watch('onTomatoProgressChange') @Prop statsVersion: number = 0;
   @Prop animationName: string = 'cat_sleep.json';
 
   private readonly stages: CompanionStage[] = [
@@ -161,7 +162,7 @@ export struct CompanionComponent {
     try {
       const data: Uint8Array = getContext(this).resourceManager.getRawFileContentSync(fileName);
       const decoder = util.TextDecoder.create('utf-8', { ignoreBOM: true });
-      const jsonString: string = decoder.decodeToString(new Uint8Array(data.buffer));
+      const jsonString: string = decoder.decodeToString(new Uint8Array(data));
       this.lottieDataCache.set(fileName, JSON.parse(jsonString) as Object);
     } catch (error) {
       console.error(`[CompanionComponent] load raw lottie failed: ${JSON.stringify(error)}`);
@@ -173,6 +174,7 @@ export struct CompanionComponent {
   private async loadAnimation(): Promise<void> {
     const fileName: string = this.getStageAnimationName();
     if (this.currentLoadedAnimation === fileName && this.animateItem !== null) {
+      this.animateItem.play();
       return;
     }
 
@@ -201,11 +203,19 @@ export struct CompanionComponent {
     });
   }
 
-  build() {
-    const stage: CompanionStage = this.getCurrentStage();
+  build(): void {
+    this.buildContent(this.getCurrentStage());
+  }
 
+  @Builder
+  private buildContent(stage: CompanionStage): void {
     Scroll() {
       Column({ space: 18 }) {
+        Text(`${this.statsVersion}`)
+          .width(0)
+          .height(0)
+          .opacity(0)
+
         Column({ space: 10 }) {
           Text('陪伴角色')
             .fontSize(28)
@@ -300,7 +310,7 @@ export struct CompanionComponent {
   }
 
   @Builder
-  private buildStatCard(title: string, value: string, accentColor: string) {
+  private buildStatCard(title: string, value: string, accentColor: string): void {
     Column({ space: 8 }) {
       Text(title)
         .fontSize(12)
@@ -318,7 +328,7 @@ export struct CompanionComponent {
   }
 
   @Builder
-  private buildInfoCard(title: string, content: string, accentColor: string) {
+  private buildInfoCard(title: string, content: string, accentColor: string): void {
     Column({ space: 8 }) {
       Text(title)
         .fontSize(13)

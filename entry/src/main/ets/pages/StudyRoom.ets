@@ -78,6 +78,7 @@ struct StudyRoom {
   @State continuousDays: number = 0;
   @State totalTomatoCount: number = 0;
   @State lastActiveDate: string = '';
+  @State statsVersion: number = 0;
 
   @State isLoggedIn: boolean = false;
   @State authMode: AuthMode = 'login';
@@ -168,6 +169,10 @@ struct StudyRoom {
 
   getTotalFocusMinutes(): number {
     return Math.floor(this.totalFocusSeconds / 60);
+  }
+
+  refreshStatsView() {
+    this.statsVersion = this.statsVersion + 1;
   }
 
   async ensurePreferences() {
@@ -559,6 +564,7 @@ struct StudyRoom {
       this.tomatoCount = this.tomatoCount + 1;
       this.completedFocusSessions = this.completedFocusSessions + 1;
       this.totalTomatoCount = this.totalTomatoCount + 1;
+      this.refreshStatsView();
 
       const today = this.getTodayKey();
       if (this.lastActiveDate !== today) {
@@ -603,6 +609,10 @@ struct StudyRoom {
         this.totalSeconds = this.totalSeconds - 1;
         if (this.currentMode === 'focus') {
           this.totalFocusSeconds = this.totalFocusSeconds + 1;
+          if (this.totalFocusSeconds % 60 === 0) {
+            this.refreshStatsView();
+            void this.saveStudyData();
+          }
         }
         this.updateTimerDisplay();
         if (this.totalSeconds === 0) {
@@ -1059,6 +1069,7 @@ struct StudyRoom {
                 continuousDays: this.continuousDays,
                 totalTomatoCount: this.totalTomatoCount,
                 todayTomatoCount: this.tomatoCount,
+                statsVersion: this.statsVersion,
                 animationName: 'cat_sleep.json'
               })
             }
@@ -1071,6 +1082,7 @@ struct StudyRoom {
                 totalTomatoCount: this.totalTomatoCount,
                 todayTomatoCount: this.tomatoCount,
                 totalFocusMinutes: this.getTotalFocusMinutes(),
+                statsVersion: this.statsVersion,
                 onNicknameChange: (value: string) => {
                   this.profile = {
                     nickname: value,
