@@ -7,6 +7,10 @@ export struct TimerComponent {
   @Prop isRunning: boolean = false;
   @Prop completedFocusSessions: number = 0;
   @Prop totalFocusSeconds: number = 0;
+  // 新增：用于绘制进度条
+  @Prop totalSeconds: number = 0;
+  @Prop totalDuration: number = 1; // 避免除零
+
   onStart: () => void = () => {};
   onPause: () => void = () => {};
   onReset: () => void = () => {};
@@ -39,8 +43,16 @@ export struct TimerComponent {
     return `${Math.floor(this.totalFocusSeconds / 60)} 分钟`;
   }
 
+  // 计算进度 (0 ~ 1)
+  private getProgress(): number {
+    const duration = this.totalDuration > 0 ? this.totalDuration : 1;
+    const remain = Math.max(0, Math.min(this.totalSeconds, duration));
+    return remain / duration;
+  }
+
   build() {
     Column() {
+      // 标题 & 当前模式标签
       Row() {
         Column() {
           Text('番茄钟')
@@ -67,6 +79,7 @@ export struct TimerComponent {
       .width('100%')
       .margin({ bottom: 14 })
 
+      // 模式切换按钮
       Row() {
         ForEach(this.modes, (mode: TimerMode) => {
           Button(this.getModeLabel(mode))
@@ -85,7 +98,28 @@ export struct TimerComponent {
       .width('100%')
       .margin({ bottom: 16 })
 
+      // ----- 计时器圆环 + 数字（核心） -----
       Stack({ alignContent: Alignment.Center }) {
+        // 背景圆环
+        Circle()
+          .width(200)
+          .height(200)
+          .stroke('rgba(255,255,255,0.12)')
+          .strokeWidth(6)
+          .fill('transparent')
+
+        // 进度圆环（金色，从顶部开始旋转）
+        Circle()
+          .width(200)
+          .height(200)
+          .stroke('#FFD878')
+          .strokeWidth(6)
+          .fill('transparent')
+          .strokeDashArray([Math.PI * 200, Math.PI * 200]) // 周长 ≈ 565.48
+          .strokeDashOffset((1 - this.getProgress()) * Math.PI * 200)
+          .rotate({ angle: -90 }) // 起点在12点钟方向
+
+        // 计时数字
         Column() {
           Text('当前计时')
             .fontSize(12)
@@ -101,18 +135,11 @@ export struct TimerComponent {
         }
         .width('100%')
         .padding({ top: 28, bottom: 28 })
-        .linearGradient({
-          angle: 135,
-          colors: [
-            ['rgba(255,255,255,0.14)', 0],
-            ['rgba(116,132,210,0.30)', 1]
-          ]
-        })
-        .borderRadius(26)
       }
       .width('100%')
       .margin({ bottom: 16 })
 
+      // 控制按钮
       Row() {
         Button(this.isRunning ? '进行中' : '开始专注')
           .fontSize(14)
@@ -152,6 +179,7 @@ export struct TimerComponent {
       }
       .width('100%')
 
+      // 时长微调
       Row() {
         Text('时长微调')
           .fontSize(12)
@@ -185,6 +213,7 @@ export struct TimerComponent {
       .width('100%')
       .margin({ top: 14, bottom: 14 })
 
+      // 统计卡片
       Row() {
         Column() {
           Text('完成轮次')

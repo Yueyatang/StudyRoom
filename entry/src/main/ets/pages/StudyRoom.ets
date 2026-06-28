@@ -4,6 +4,7 @@ import preferences from '@ohos.data.preferences';
 import { SceneSelector } from '../components/SceneSelector';
 import { TimerComponent } from '../components/TimerComponent';
 import { TodoComponent } from '../components/TodoComponent';
+import { CompanionComponent } from '../components/CompanionComponent';   // 新增
 import { SceneData, TimerMode, TodoItem } from '../common/StudyRoomTypes';
 
 @Entry
@@ -72,6 +73,11 @@ struct StudyRoom {
   @State soundEnabled: boolean = true;
   @State showCompletedTodos: boolean = false;
 
+  // ----- 陪伴系统新增状态 -----
+  @State continuousDays: number = 0;
+  @State totalTomatoCount: number = 0;
+  @State lastActiveDate: string = '';
+
   private timerId: number = -1;
   private clockId: number = -1;
   private musicPlayer: media.AVPlayer | null = null;
@@ -125,14 +131,60 @@ struct StudyRoom {
     }
   }
 
-  getMusicStatusText(): string {
-    return this.musicEnabled ? this.getCurrentScene().musicLabel : '沉浸音乐已关闭';
+  // ----- 日期工具 -----
+  getDateKey(date: Date): string {
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${year}-${month}-${day}`;
   }
 
-  getSoundStatusText(): string {
-    return this.soundEnabled ? this.getCurrentScene().soundLabel : '环境音效已关闭';
+  getTodayKey(): string {
+    return this.getDateKey(new Date());
   }
 
+  // ----- 音频控制（与之前完全一致） -----
+  async setMusicEnabled(enable: boolean) {
+    if (this.musicEnabled === enable) return;
+    this.musicEnabled = enable;
+    if (enable) {
+      this.activeMusicName = '';
+      await this.updateSceneMusic();
+      promptAction.showToast({
+        message: '已开启沉浸音乐',
+        duration: 1200
+      });
+    } else {
+      this.activeMusicName = '';
+      await this.stopMusicPlayback();
+      promptAction.showToast({
+        message: '已关闭沉浸音乐',
+        duration: 1200
+      });
+    }
+  }
+
+  async setSoundEnabled(enable: boolean) {
+    if (this.soundEnabled === enable) return;
+    this.soundEnabled = enable;
+    if (enable) {
+      this.activeSoundName = '';
+      await this.updateSceneSound();
+      promptAction.showToast({
+        message: '已开启环境音效',
+        duration: 1200
+      });
+    } else {
+      this.activeSoundName = '';
+      await this.stopSoundPlayback();
+      promptAction.showToast({
+        message: '已关闭环境音效',
+        duration: 1200
+      });
+    }
+  }
+
+  // ----- 音频引擎（与之前完全一致） -----
   async initMusicPlayer() {
     try {
       this.musicPlayer = await media.createAVPlayer();
@@ -389,46 +441,7 @@ struct StudyRoom {
     }
   }
 
-  async toggleMusic() {
-    this.musicEnabled = !this.musicEnabled;
-    if (this.musicEnabled) {
-      this.activeMusicName = '';
-      await this.updateSceneMusic();
-      promptAction.showToast({
-        message: '已开启沉浸音乐',
-        duration: 1200
-      });
-      return;
-    }
-
-    this.activeMusicName = '';
-    await this.stopMusicPlayback();
-    promptAction.showToast({
-      message: '已关闭沉浸音乐',
-      duration: 1200
-    });
-  }
-
-  async toggleSound() {
-    this.soundEnabled = !this.soundEnabled;
-    if (this.soundEnabled) {
-      this.activeSoundName = '';
-      await this.updateSceneSound();
-      promptAction.showToast({
-        message: '已开启环境音效',
-        duration: 1200
-      });
-      return;
-    }
-
-    this.activeSoundName = '';
-    await this.stopSoundPlayback();
-    promptAction.showToast({
-      message: '已关闭环境音效',
-      duration: 1200
-    });
-  }
-
+  // ----- 计时器逻辑 -----
   startClock() {
     this.updateCurrentTime();
     this.clockId = setInterval(() => {
@@ -442,14 +455,6 @@ struct StudyRoom {
     const minutes = now.getMinutes().toString().padStart(2, '0');
     const seconds = now.getSeconds().toString().padStart(2, '0');
     this.currentTime = `${hours}:${minutes}:${seconds}`;
-  }
-
-  getTodayKey(): string {
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = `${now.getMonth() + 1}`.padStart(2, '0');
-    const day = `${now.getDate()}`.padStart(2, '0');
-    return `${year}-${month}-${day}`;
   }
 
   async ensurePreferences() {
@@ -478,9 +483,14 @@ struct StudyRoom {
         await store.put('tomatoCount', 0);
         await store.put('completedFocusSessions', 0);
         await store.put('totalFocusSeconds', 0);
-        await store.flush();
       }
 
+      // 读取陪伴系统数据（不随日期重置）
+      this.continuousDays = Number((await store.get('continuousDays', 0)) as number);
+      this.totalTomatoCount = Number((await store.get('totalTomatoCount', 0)) as number);
+      this.lastActiveDate = (await store.get('lastActiveDate', '')) as string;
+
+      // 读取待办
       const savedTodos = (await store.get('todoList', '')) as string;
       if (savedTodos !== undefined && savedTodos !== '') {
         const parsed: TodoItem[] = JSON.parse(savedTodos);
@@ -496,10 +506,14 @@ struct StudyRoom {
             normalizedTodoList.push(normalizedItem);
           });
           this.todoList = normalizedTodoList;
-          return;
+        } else {
+          await this.initDefaultTodos();
         }
+      } else {
+        await this.initDefaultTodos();
       }
-      await this.initDefaultTodos();
+
+      await store.flush();
     } catch (e) {
       await this.initDefaultTodos();
     }
@@ -507,9 +521,9 @@ struct StudyRoom {
 
   async initDefaultTodos() {
     this.todoList = [
-      { id: 1, text: '????', completed: false, pinned: true },
-      { id: 2, text: '????', completed: false, pinned: false },
-      { id: 3, text: '???', completed: false, pinned: false }
+      { id: 1, text: '阅读', completed: false, pinned: true },
+      { id: 2, text: '笔记', completed: false, pinned: false },
+      { id: 3, text: '复习', completed: false, pinned: false }
     ];
     await this.saveStudyData();
   }
@@ -522,6 +536,10 @@ struct StudyRoom {
       await store.put('tomatoCount', this.tomatoCount);
       await store.put('completedFocusSessions', this.completedFocusSessions);
       await store.put('totalFocusSeconds', this.totalFocusSeconds);
+      // 陪伴系统数据
+      await store.put('continuousDays', this.continuousDays);
+      await store.put('totalTomatoCount', this.totalTomatoCount);
+      await store.put('lastActiveDate', this.lastActiveDate);
       await store.flush();
     } catch (error) {
       console.error(`save study data failed: ${JSON.stringify(error)}`);
@@ -540,12 +558,12 @@ struct StudyRoom {
 
   getModeLabel(mode: TimerMode): string {
     if (mode === 'focus') {
-      return '??';
+      return '专注';
     }
     if (mode === 'shortBreak') {
-      return '???';
+      return '短休息';
     }
-    return '???';
+    return '长休息';
   }
 
   applyCurrentModeDuration() {
@@ -565,12 +583,32 @@ struct StudyRoom {
     if (this.currentMode === 'focus') {
       this.tomatoCount = this.tomatoCount + 1;
       this.completedFocusSessions = this.completedFocusSessions + 1;
+      // ---- 陪伴系统数据更新 ----
+      this.totalTomatoCount = this.totalTomatoCount + 1;
+      const today = this.getTodayKey();
+      if (this.lastActiveDate !== today) {
+        // 如果上次不是今天，更新连续天数
+        if (this.lastActiveDate === '') {
+          // 第一次使用
+          this.continuousDays = 1;
+        } else {
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayKey = this.getDateKey(yesterday);
+          if (this.lastActiveDate === yesterdayKey) {
+            this.continuousDays = this.continuousDays + 1;
+          } else {
+            this.continuousDays = 1; // 中断重置
+          }
+        }
+        this.lastActiveDate = today;
+      }
       void this.saveStudyData();
 
       const nextMode: TimerMode = this.completedFocusSessions % 4 === 0 ? 'longBreak' : 'shortBreak';
       this.switchMode(nextMode, true);
       promptAction.showToast({
-        message: `??????????${this.getModeLabel(nextMode)}`,
+        message: `专注结束，进入${this.getModeLabel(nextMode)}`,
         duration: 2000
       });
       return;
@@ -578,7 +616,7 @@ struct StudyRoom {
 
     this.switchMode('focus', true);
     promptAction.showToast({
-      message: '???????????',
+      message: '休息结束，开始专注',
       duration: 2000
     });
   }
@@ -751,11 +789,14 @@ struct StudyRoom {
 
   build() {
     Stack() {
+      // 背景图（模糊）
       Image(this.getSceneBackground())
         .width('100%')
         .height('100%')
         .objectFit(ImageFit.Cover)
+        .blur(6)
 
+      // 渐变遮罩1
       Column()
         .width('100%')
         .height('100%')
@@ -768,161 +809,188 @@ struct StudyRoom {
           ]
         })
 
+      // 渐变遮罩2
       Column()
         .width('100%')
         .height('100%')
         .backgroundColor(`rgba(8,12,20,${this.backgroundOverlayOpacity})`)
 
+      // 主内容
       Column() {
         Row()
           .height(24)
           .width('100%')
 
-        Scroll() {
-          Column() {
-            SceneSelector({
-              scenes: this.scenes,
-              currentSceneIndex: this.currentSceneIndex,
-              onSceneChange: (index: number) => {
-                this.switchScene(index);
-              },
-              onRandomScene: () => {
-                this.randomScene();
-              }
-            })
-
-            Row() {
+        Tabs({ barPosition: BarPosition.End }) {
+          // ----- Tab 1: 学习 -----
+          TabContent() {
+            Scroll() {
               Column() {
-                Text('沉浸音乐')
-                  .fontSize(12)
-                  .fontColor('#D5D9DE')
-                Text(this.getMusicStatusText())
-                  .fontSize(14)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor('#FFFFFF')
-                  .maxLines(1)
-                  .margin({ top: 6 })
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start)
-
-              Button(this.musicEnabled ? '关闭音乐' : '开启音乐')
-                .fontSize(12)
-                .height(34)
-                .backgroundColor('rgba(255,255,255,0.14)')
-                .borderRadius(17)
-                .onClick(() => {
-                  this.toggleMusic();
+                SceneSelector({
+                  scenes: this.scenes,
+                  currentSceneIndex: this.currentSceneIndex,
+                  onSceneChange: (index: number) => {
+                    this.switchScene(index);
+                  },
+                  onRandomScene: () => {
+                    this.randomScene();
+                  }
                 })
-            }
-            .width('90%')
-            .padding({ left: 16, right: 16, top: 14, bottom: 14 })
-            .backgroundColor('rgba(17,20,29,0.30)')
-            .borderRadius(24)
-            .margin({ bottom: 12 })
 
-            Row() {
-              Column() {
-                Text('环境音效')
-                  .fontSize(12)
-                  .fontColor('#D5D9DE')
-                Text(this.getSoundStatusText())
-                  .fontSize(14)
-                  .fontWeight(FontWeight.Medium)
-                  .fontColor('#FFFFFF')
-                  .maxLines(1)
-                  .margin({ top: 6 })
-              }
-              .layoutWeight(1)
-              .alignItems(HorizontalAlign.Start)
+                // 合并后的音乐/音效开关
+                Row() {
+                  Row() {
+                    Text('音乐')
+                      .fontSize(14)
+                      .fontColor('#D5D9DE')
+                    Toggle({ type: ToggleType.Switch, isOn: this.musicEnabled })
+                      .onChange((isOn: boolean) => {
+                        this.setMusicEnabled(isOn);
+                      })
+                    Text(this.getCurrentScene().musicLabel)
+                      .fontSize(11)
+                      .fontColor('#D5D9DE')
+                      .maxLines(1)
+                      .layoutWeight(1)
+                  }
+                  .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+                  .backgroundColor('rgba(255,255,255,0.08)')
+                  .borderRadius(20)
+                  .layoutWeight(1)
 
-              Button(this.soundEnabled ? '关闭音效' : '开启音效')
-                .fontSize(12)
-                .height(34)
-                .backgroundColor('rgba(255,255,255,0.14)')
-                .borderRadius(17)
-                .onClick(() => {
-                  this.toggleSound();
+                  Divider()
+                    .vertical(true)
+                    .height(24)
+                    .margin({ left: 6, right: 6 })
+                    .color('rgba(255,255,255,0.12)')
+
+                  Row() {
+                    Text('音效')
+                      .fontSize(14)
+                      .fontColor('#D5D9DE')
+                    Toggle({ type: ToggleType.Switch, isOn: this.soundEnabled })
+                      .onChange((isOn: boolean) => {
+                        this.setSoundEnabled(isOn);
+                      })
+                    Text(this.getCurrentScene().soundLabel)
+                      .fontSize(11)
+                      .fontColor('#D5D9DE')
+                      .maxLines(1)
+                      .layoutWeight(1)
+                  }
+                  .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+                  .backgroundColor('rgba(255,255,255,0.08)')
+                  .borderRadius(20)
+                  .layoutWeight(1)
+                }
+                .width('90%')
+                .padding({ left: 16, right: 16, top: 12, bottom: 12 })
+                .backgroundColor('rgba(17,20,29,0.30)')
+                .borderRadius(24)
+                .margin({ bottom: 12 })
+
+                // 计时器
+                TimerComponent({
+                  timerDisplay: this.timerDisplay,
+                  currentMode: this.currentMode,
+                  isRunning: this.isRunning,
+                  completedFocusSessions: this.completedFocusSessions,
+                  totalFocusSeconds: this.totalFocusSeconds,
+                  totalSeconds: this.totalSeconds,
+                  totalDuration: this.currentSessionTotalSeconds,
+                  onStart: () => {
+                    this.startTimer();
+                  },
+                  onPause: () => {
+                    this.pauseTimer();
+                  },
+                  onReset: () => {
+                    this.resetTimer();
+                  },
+                  onAdjustMinutes: (minutes: number) => {
+                    this.addMinutes(minutes);
+                  },
+                  onSelectMode: (mode: TimerMode) => {
+                    this.switchMode(mode);
+                  }
                 })
-            }
-            .width('90%')
-            .padding({ left: 16, right: 16, top: 14, bottom: 14 })
-            .backgroundColor('rgba(17,20,29,0.30)')
-            .borderRadius(24)
-            .margin({ bottom: 16 })
 
-            TimerComponent({
-              timerDisplay: this.timerDisplay,
-              currentMode: this.currentMode,
-              isRunning: this.isRunning,
-              completedFocusSessions: this.completedFocusSessions,
-              totalFocusSeconds: this.totalFocusSeconds,
-              onStart: () => {
-                this.startTimer();
-              },
-              onPause: () => {
-                this.pauseTimer();
-              },
-              onReset: () => {
-                this.resetTimer();
-              },
-              onAdjustMinutes: (minutes: number) => {
-                this.addMinutes(minutes);
-              },
-              onSelectMode: (mode: TimerMode) => {
-                this.switchMode(mode);
+                // 今日番茄数
+                Row() {
+                  Text('今日番茄数')
+                    .fontSize(14)
+                    .fontColor('#CCCCCC')
+                  Blank()
+                  Text(`${this.tomatoCount}`)
+                    .fontSize(22)
+                    .fontWeight(FontWeight.Bold)
+                    .fontColor('#FFB347')
+                }
+                .width('90%')
+                .backgroundColor('rgba(0,0,0,0.25)')
+                .borderRadius(22)
+                .padding({ left: 18, right: 18, top: 10, bottom: 10 })
+                .margin({ bottom: 16 })
               }
-            })
-
-            Row() {
-              Text('今日番茄数')
-                .fontSize(14)
-                .fontColor('#CCCCCC')
-              Blank()
-              Text(`${this.tomatoCount}`)
-                .fontSize(22)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#FFB347')
+              .width('100%')
+              .scale({ x: this.sceneInfoScale, y: this.sceneInfoScale })
+              .alignItems(HorizontalAlign.Center)
             }
-            .width('90%')
-            .backgroundColor('rgba(0,0,0,0.25)')
-            .borderRadius(22)
-            .padding({ left: 18, right: 18, top: 10, bottom: 10 })
-            .margin({ bottom: 16 })
+            .scrollBar(BarState.Auto)
+            .edgeEffect(EdgeEffect.Spring)
+            .backgroundColor('rgba(0,0,0,0)')
+            .width('100%')
+            .layoutWeight(1)
+          }
+          .tabBar('📚 学习')
 
-            TodoComponent({
-              todoList: this.todoList,
-              newTodoText: this.newTodoText,
-              showCompleted: this.showCompletedTodos,
-              onToggle: (index: number) => {
-                this.toggleTodo(index);
-              },
-              onDelete: (index: number) => {
-                this.deleteTodo(index);
-              },
-              onTextChange: (value: string) => {
-                this.newTodoText = value;
-              },
-              onAdd: () => {
-                this.addTodo();
-              },
-              onToggleCompletedSection: () => {
-                this.toggleCompletedSection();
-              },
-              onPin: (index: number) => {
-                this.pinTodo(index);
-              }
+          // ----- Tab 2: 待办 -----
+          TabContent() {
+            Scroll() {
+              TodoComponent({
+                todoList: this.todoList,
+                newTodoText: this.newTodoText,
+                showCompleted: this.showCompletedTodos,
+                onToggle: (index: number) => {
+                  this.toggleTodo(index);
+                },
+                onDelete: (index: number) => {
+                  this.deleteTodo(index);
+                },
+                onTextChange: (value: string) => {
+                  this.newTodoText = value;
+                },
+                onAdd: () => {
+                  this.addTodo();
+                },
+                onToggleCompletedSection: () => {
+                  this.toggleCompletedSection();
+                },
+                onPin: (index: number) => {
+                  this.pinTodo(index);
+                }
+              })
+            }
+            .scrollBar(BarState.Auto)
+            .edgeEffect(EdgeEffect.Spring)
+            .width('100%')
+            .layoutWeight(1)
+          }
+          .tabBar('✅ 待办')
+
+          // ----- Tab 3: 陪伴系统（新） -----
+          TabContent() {
+            CompanionComponent({
+              continuousDays: this.continuousDays,
+              totalTomatoCount: this.totalTomatoCount
             })
           }
-          .width('100%')
-          .scale({ x: this.sceneInfoScale, y: this.sceneInfoScale })
-          .alignItems(HorizontalAlign.Center)
+          .tabBar('🤝 陪伴')
         }
-        .backgroundColor('rgba(0,0,0,0)')
-        .scrollBar(BarState.Off)
         .width('100%')
         .layoutWeight(1)
 
+        // 底部时间 & 名言
         Row() {
           Text(this.currentTime)
             .fontSize(13)
