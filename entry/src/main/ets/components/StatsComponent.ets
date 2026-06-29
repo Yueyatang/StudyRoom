@@ -1,4 +1,5 @@
 import { DailyTomatoRecord } from '../common/StudyRoomTypes';
+import promptAction from '@ohos.promptAction';
 
 @Component
 export struct StatsComponent {
@@ -100,6 +101,14 @@ export struct StatsComponent {
     return activeDays;
   }
 
+  private showContributionDetail(item: DailyTomatoRecord) {
+    const message = item.count > 0 ? `${item.date} 完成 ${item.count} 个番茄` : `${item.date} 暂无番茄记录`;
+    promptAction.showToast({
+      message: message,
+      duration: 1600
+    });
+  }
+
   build() {
     Column({ space: 14 }) {
       Text(`${this.statsVersion}`)
@@ -155,6 +164,9 @@ export struct StatsComponent {
                   .aspectRatio(1)
                   .backgroundColor(this.getContributionColor(item.count))
                   .borderRadius(3)
+                  .onClick(() => {
+                    this.showContributionDetail(item);
+                  })
               }, (item: DailyTomatoRecord) => item.date)
             }
             .layoutWeight(1)

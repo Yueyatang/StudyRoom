@@ -113,9 +113,13 @@ struct StudyRoom {
   private soundPlayerState: media.AVPlayerState = 'idle';
   private studyRoomPreferences: preferences.Preferences | null = null;
   private readonly preferencesName: string = 'study_room_preferences';
+  private readonly enableMockData: boolean = true;
 
   async aboutToAppear() {
     await this.loadData();
+    if (this.enableMockData) {
+      this.applyMockData();
+    }
     this.applyCurrentModeDuration();
     this.startClock();
     this.initMusicPlayer();
@@ -296,6 +300,98 @@ struct StudyRoom {
       }
     }
     return -1;
+  }
+
+  applyMockData() {
+    const todayKey = this.getTodayKey();
+    this.currentSceneIndex = 1;
+    this.currentTabIndex = 0;
+    this.isLoggedIn = true;
+    this.savedAccount = '8209230113';
+    this.savedPassword = '123456';
+    this.profile = {
+      nickname: '卿晨',
+      account: this.savedAccount,
+      signature: '用番茄钟把每天的学习沉淀下来。',
+      targetTomatoes: 6
+    };
+
+    this.tomatoCount = 4;
+    this.completedFocusSessions = 4;
+    this.totalFocusSeconds = 95 * 60;
+    this.totalTomatoCount = 52;
+    this.continuousDays = 12;
+    this.lastActiveDate = todayKey;
+    this.showCompletedTodos = true;
+
+    this.todoList = [
+      {
+        id: 1001,
+        text: '完善鸿蒙课程项目报告',
+        completed: false,
+        pinned: true,
+        estimatedTomatoes: 4,
+        doneTomatoes: 2
+      },
+      {
+        id: 1002,
+        text: '整理 StudyRoom 演示截图',
+        completed: false,
+        pinned: false,
+        estimatedTomatoes: 3,
+        doneTomatoes: 1
+      },
+      {
+        id: 1003,
+        text: '复习 ArkTS 状态管理',
+        completed: false,
+        pinned: false,
+        estimatedTomatoes: 2,
+        doneTomatoes: 0
+      },
+      {
+        id: 1004,
+        text: '完成 Lottie 陪伴角色说明',
+        completed: true,
+        pinned: false,
+        estimatedTomatoes: 2,
+        doneTomatoes: 2
+      },
+      {
+        id: 1005,
+        text: '测试音乐与环境音切换',
+        completed: true,
+        pinned: false,
+        estimatedTomatoes: 1,
+        doneTomatoes: 1
+      }
+    ];
+    this.activeTodoId = 1001;
+    this.dailyTomatoRecords = this.buildMockDailyTomatoRecords();
+    this.refreshStatsView();
+  }
+
+  buildMockDailyTomatoRecords(): DailyTomatoRecord[] {
+    const mockCounts: number[] = [
+      0, 1, 2, 4, 0, 3, 5, 1, 0, 2,
+      3, 6, 0, 1, 4, 2, 0, 5, 3, 1,
+      0, 0, 2, 4, 6, 1, 3, 0, 2, 5,
+      4, 0, 1, 2, 6, 3, 0, 4, 5, 2,
+      1, 0, 3, 6, 4, 2, 0, 1, 5, 3,
+      2, 4, 0, 6, 1, 3, 5, 0, 2, 4,
+      6, 3, 1, 0, 5, 2, 4, 3, 1, 4
+    ];
+    const records: DailyTomatoRecord[] = [];
+    for (let offset = 69; offset >= 0; offset--) {
+      const date = new Date();
+      date.setDate(date.getDate() - offset);
+      const countIndex = 69 - offset;
+      records.push({
+        date: this.getDateKey(date),
+        count: mockCounts[countIndex]
+      });
+    }
+    return records;
   }
 
   normalizeDailyTomatoRecords(rawRecords: string): DailyTomatoRecord[] {
@@ -680,6 +776,21 @@ struct StudyRoom {
     this.timerDisplay = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   }
 
+  showSessionReminder(title: string, message: string) {
+    promptAction.showDialog({
+      title: title,
+      message: message,
+      buttons: [
+        {
+          text: '知道了',
+          color: '#FFD878'
+        }
+      ]
+    }).catch((error: Error) => {
+      console.error(`[StudyRoom] show session reminder failed: ${JSON.stringify(error)}`);
+    });
+  }
+
   completeCurrentSession() {
     this.stopTimer();
     if (this.currentMode === 'focus') {
@@ -706,6 +817,7 @@ struct StudyRoom {
 
       const nextMode: TimerMode = this.completedFocusSessions % 4 === 0 ? 'longBreak' : 'shortBreak';
       this.switchMode(nextMode, true);
+      this.showSessionReminder('专注完成', `本轮专注已结束，接下来进入${this.getModeLabel(nextMode)}。`);
       promptAction.showToast({
         message: `专注结束，进入${this.getModeLabel(nextMode)}`,
         duration: 2000
@@ -714,6 +826,7 @@ struct StudyRoom {
     }
 
     this.switchMode('focus', true);
+    this.showSessionReminder('休息结束', '休息时间结束，已为你切回下一轮专注。');
     promptAction.showToast({
       message: '休息结束，开始下一轮专注',
       duration: 2000
