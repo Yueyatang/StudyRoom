@@ -1,5 +1,4 @@
 import { DailyTomatoRecord } from '../common/StudyRoomTypes';
-import promptAction from '@ohos.promptAction';
 
 @Component
 export struct StatsComponent {
@@ -10,6 +9,8 @@ export struct StatsComponent {
   @Prop targetTomatoes: number = 6;
   @Prop contributionDays: DailyTomatoRecord[] = [];
   @Prop statsVersion: number = 0;
+  @State selectedContributionDate: string = '';
+  @State selectedContributionText: string = '悬停或点击格子查看当天记录';
 
   private getSafeTarget(): number {
     if (this.targetTomatoes <= 0) {
@@ -102,11 +103,8 @@ export struct StatsComponent {
   }
 
   private showContributionDetail(item: DailyTomatoRecord) {
-    const message = item.count > 0 ? `${item.date} 完成 ${item.count} 个番茄` : `${item.date} 暂无番茄记录`;
-    promptAction.showToast({
-      message: message,
-      duration: 1600
-    });
+    this.selectedContributionDate = item.date;
+    this.selectedContributionText = item.count > 0 ? `${item.date} 完成 ${item.count} 个番茄` : `${item.date} 暂无番茄记录`;
   }
 
   build() {
@@ -164,6 +162,15 @@ export struct StatsComponent {
                   .aspectRatio(1)
                   .backgroundColor(this.getContributionColor(item.count))
                   .borderRadius(3)
+                  .border({
+                    width: this.selectedContributionDate === item.date ? 1 : 0,
+                    color: 'rgba(255,255,255,0.82)'
+                  })
+                  .onHover((isHover: boolean) => {
+                    if (isHover) {
+                      this.showContributionDetail(item);
+                    }
+                  })
                   .onClick(() => {
                     this.showContributionDetail(item);
                   })
@@ -175,6 +182,13 @@ export struct StatsComponent {
         .width('100%')
         .justifyContent(FlexAlign.SpaceBetween)
         .padding({ top: 6, bottom: 6 })
+
+        Text(this.selectedContributionText)
+          .fontSize(11)
+          .fontColor('rgba(255,255,255,0.68)')
+          .width('100%')
+          .textAlign(TextAlign.Center)
+          .padding({ top: 4, bottom: 2 })
 
         Row({ space: 5 }) {
           Text('少')
