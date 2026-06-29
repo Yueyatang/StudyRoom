@@ -8,6 +8,7 @@ import { CompanionComponent } from '../components/CompanionComponent';
 import { AuthComponent } from '../components/AuthComponent';
 import { ProfileComponent } from '../components/ProfileComponent';
 import { StatsComponent } from '../components/StatsComponent';
+import { ImmersionVideoComponent } from '../components/ImmersionVideoComponent';
 import { AuthMode, DailyTomatoRecord, SceneData, TimerMode, TodoItem, UserProfile } from '../common/StudyRoomTypes';
 
 @Entry
@@ -300,6 +301,22 @@ struct StudyRoom {
       }
     }
     return -1;
+  }
+
+  getActiveTodoText(): string {
+    const activeIndex = this.getActiveTodoIndex();
+    if (activeIndex === -1) {
+      return '';
+    }
+    return this.todoList[activeIndex].text;
+  }
+
+  getActiveTodoProgressText(): string {
+    const activeIndex = this.getActiveTodoIndex();
+    if (activeIndex === -1) {
+      return '';
+    }
+    return `${this.todoList[activeIndex].doneTomatoes}/${this.todoList[activeIndex].estimatedTomatoes} 番茄`;
   }
 
   applyMockData() {
@@ -1371,6 +1388,18 @@ struct StudyRoom {
             .tabBar(this.buildTabBarItem('陪伴', 2))
 
             TabContent() {
+              ImmersionVideoComponent({
+                isRunning: this.isRunning,
+                timerDisplay: this.timerDisplay,
+                currentSceneName: this.getCurrentScene().name,
+                suggestion: this.getCurrentScene().suggestion,
+                activeTaskText: this.getActiveTodoText(),
+                activeTaskProgress: this.getActiveTodoProgressText()
+              })
+            }
+            .tabBar(this.buildTabBarItem('沉浸', 3))
+
+            TabContent() {
               ProfileComponent({
                 profile: this.profile,
                 continuousDays: this.continuousDays,
@@ -1411,7 +1440,7 @@ struct StudyRoom {
                 }
               })
             }
-            .tabBar(this.buildTabBarItem('我的', 3))
+            .tabBar(this.buildTabBarItem('我的', 4))
           }
           .width('100%')
           .layoutWeight(1)

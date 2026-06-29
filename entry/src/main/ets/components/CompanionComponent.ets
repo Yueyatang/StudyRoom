@@ -18,7 +18,7 @@ export struct CompanionComponent {
   @Prop continuousDays: number = 0;
   @Watch('onTomatoProgressChange') @Prop totalTomatoCount: number = 0;
   @Prop todayTomatoCount: number = 0;
-  @Watch('onTomatoProgressChange') @Prop statsVersion: number = 0;
+  @Prop statsVersion: number = 0;
   @Prop animationName: string = 'cat_sleep.json';
 
   private readonly stages: CompanionStage[] = [
@@ -255,6 +255,7 @@ export struct CompanionComponent {
               .onReady(() => {
                 this.canvasRenderingContext.imageSmoothingEnabled = true;
                 this.canvasRenderingContext.imageSmoothingQuality = 'medium';
+                this.currentLoadedAnimation = '';
                 void this.loadAnimation();
               })
 
