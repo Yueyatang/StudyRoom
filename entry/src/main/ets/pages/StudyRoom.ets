@@ -7,6 +7,7 @@ import { TodoComponent } from '../components/TodoComponent';
 import { CompanionComponent } from '../components/CompanionComponent';
 import { AuthComponent } from '../components/AuthComponent';
 import { ProfileComponent } from '../components/ProfileComponent';
+import { StatsComponent } from '../components/StatsComponent';
 import { AuthMode, SceneData, TimerMode, TodoItem, UserProfile } from '../common/StudyRoomTypes';
 
 @Entry
@@ -1001,21 +1002,14 @@ struct StudyRoom {
                     }
                   })
 
-                  Row() {
-                    Text('今日番茄数')
-                      .fontSize(14)
-                      .fontColor('#CCCCCC')
-                    Blank()
-                    Text(`${this.tomatoCount}`)
-                      .fontSize(22)
-                      .fontWeight(FontWeight.Bold)
-                      .fontColor('#FFB347')
-                  }
-                  .width('90%')
-                  .backgroundColor('rgba(0,0,0,0.25)')
-                  .borderRadius(22)
-                  .padding({ left: 18, right: 18, top: 10, bottom: 10 })
-                  .margin({ bottom: 16 })
+                  StatsComponent({
+                    todayTomatoCount: this.tomatoCount,
+                    totalFocusMinutes: this.getTotalFocusMinutes(),
+                    continuousDays: this.continuousDays,
+                    totalTomatoCount: this.totalTomatoCount,
+                    targetTomatoes: this.profile.targetTomatoes,
+                    statsVersion: this.statsVersion
+                  })
 
                   this.buildCompanionPreview()
                 }
