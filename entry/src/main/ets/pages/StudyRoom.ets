@@ -9,7 +9,7 @@ import { AuthComponent } from '../components/AuthComponent';
 import { ProfileComponent } from '../components/ProfileComponent';
 import { StatsComponent } from '../components/StatsComponent';
 import { ImmersionVideoComponent } from '../components/ImmersionVideoComponent';
-import { AuthMode, DailyTomatoRecord, SceneData, TimerMode, TodoItem, UserProfile } from '../common/StudyRoomTypes';
+import { AuthMode, CompanionDailyTask, CompanionProgress, DailyTomatoRecord, SceneData, TimerMode, TodoItem, UserProfile } from '../common/StudyRoomTypes';
 
 @Entry
 @Component
@@ -83,6 +83,18 @@ struct StudyRoom {
   @State lastActiveDate: string = '';
   @State statsVersion: number = 0;
   @State dailyTomatoRecords: DailyTomatoRecord[] = [];
+  @State companionProgress: CompanionProgress = {
+    level: 1,
+    totalAffinity: 0,
+    currentLevelAffinity: 0,
+    nextLevelAffinity: 100
+  };
+  @State pendingAffinity: number = 0;
+  @State companionDailyTasks: CompanionDailyTask[] = [];
+  @State showCompanionLevelUpModal: boolean = false;
+  @State unlockedStageTitle: string = '';
+  @State unlockedStageReward: string = '';
+  @State latestClaimSummary: string = '';
 
   @State isLoggedIn: boolean = false;
   @State authMode: AuthMode = 'login';
@@ -188,6 +200,226 @@ struct StudyRoom {
     this.statsVersion = this.statsVersion + 1;
   }
 
+  getCompanionLevelRequirement(level: number): number {
+    if (level <= 1) {
+      return 100;
+    }
+    if (level === 2) {
+      return 120;
+    }
+    if (level === 3) {
+      return 140;
+    }
+    if (level === 4) {
+      return 160;
+    }
+    if (level === 5) {
+      return 180;
+    }
+    return 220;
+  }
+
+  buildCompanionProgress(totalAffinity: number): CompanionProgress {
+    let currentLevel = 1;
+    let usedAffinity = 0;
+    let nextRequirement = this.getCompanionLevelRequirement(currentLevel);
+
+    while (totalAffinity >= usedAffinity + nextRequirement && currentLevel < 6) {
+      usedAffinity = usedAffinity + nextRequirement;
+      currentLevel = currentLevel + 1;
+      nextRequirement = this.getCompanionLevelRequirement(currentLevel);
+    }
+
+    return {
+      level: currentLevel,
+      totalAffinity: totalAffinity,
+      currentLevelAffinity: totalAffinity - usedAffinity,
+      nextLevelAffinity: currentLevel >= 6 ? nextRequirement : nextRequirement
+    };
+  }
+
+  buildDefaultCompanionDailyTasks(): CompanionDailyTask[] {
+    return [
+      {
+        id: 'focus_once',
+        title: '完成一轮专注',
+        description: '去完成 1 轮专注番茄，和陪伴角色一起进入状态。',
+        reward: 12,
+        progress: 0,
+        target: 1,
+        completed: false,
+        claimed: false
+      },
+      {
+        id: 'focus_twice',
+        title: '完成两轮专注',
+        description: '今天再多完成 2 轮专注，默契会提升得更快。',
+        reward: 18,
+        progress: 0,
+        target: 2,
+        completed: false,
+        claimed: false
+      },
+      {
+        id: 'finish_todo',
+        title: '完成一个学习任务',
+        description: '把一项学习清单真正做完，陪伴角色会更认可你。',
+        reward: 25,
+        progress: 0,
+        target: 1,
+        completed: false,
+        claimed: false
+      }
+    ];
+  }
+
+  syncCompanionDailyTaskProgress() {
+    const focusCount = this.tomatoCount;
+    let completedTodoCount = 0;
+    this.todoList.forEach((item: TodoItem) => {
+      if (item.completed) {
+        completedTodoCount = completedTodoCount + 1;
+      }
+    });
+
+    const nextTasks: CompanionDailyTask[] = [];
+    this.companionDailyTasks.forEach((task: CompanionDailyTask) => {
+      let progress = task.progress;
+      if (task.id === 'focus_once') {
+        progress = Math.min(task.target, focusCount);
+      } else if (task.id === 'focus_twice') {
+        progress = Math.min(task.target, focusCount);
+      } else if (task.id === 'finish_todo') {
+        progress = Math.min(task.target, completedTodoCount);
+      }
+
+      nextTasks.push({
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        reward: task.reward,
+        progress: progress,
+        target: task.target,
+        completed: progress >= task.target,
+        claimed: task.claimed
+      });
+    });
+    this.companionDailyTasks = nextTasks;
+  }
+
+  claimCompletedDailyTasks() {
+    let claimedReward = 0;
+    const nextTasks: CompanionDailyTask[] = [];
+    this.companionDailyTasks.forEach((task: CompanionDailyTask) => {
+      if (task.completed && !task.claimed) {
+        claimedReward = claimedReward + task.reward;
+        nextTasks.push({
+          id: task.id,
+          title: task.title,
+          description: task.description,
+          reward: task.reward,
+          progress: task.progress,
+          target: task.target,
+          completed: true,
+          claimed: true
+        });
+        return;
+      }
+      nextTasks.push(task);
+    });
+    this.companionDailyTasks = nextTasks;
+    if (claimedReward > 0) {
+      this.grantPendingAffinity(claimedReward);
+    }
+    return claimedReward;
+  }
+
+  dismissCompanionLevelUpModal() {
+    this.showCompanionLevelUpModal = false;
+  }
+
+  claimCompanionRewards() {
+    const claimedTaskReward = this.claimCompletedDailyTasks();
+    if (this.pendingAffinity <= 0) {
+      if (claimedTaskReward > 0) {
+        this.latestClaimSummary = `已自动结算每日任务奖励 ${claimedTaskReward} 点。`;
+        promptAction.showToast({
+          message: `已结算每日任务奖励 ${claimedTaskReward} 点`,
+          duration: 1600
+        });
+        void this.saveStudyData();
+      }
+      return;
+    }
+
+    const claimedAffinity = this.pendingAffinity;
+    const previousLevel = this.companionProgress.level;
+    this.companionProgress = this.buildCompanionProgress(this.companionProgress.totalAffinity + claimedAffinity);
+    this.pendingAffinity = 0;
+
+    if (this.companionProgress.level > previousLevel) {
+      this.showCompanionLevelUpModal = true;
+      this.unlockedStageTitle = `Lv.${this.companionProgress.level}`;
+      this.unlockedStageReward = `解锁了新的动作或皮肤，并领取了 ${claimedAffinity} 点默契值。`;
+      this.latestClaimSummary = `本次领取 ${claimedAffinity} 点默契值${claimedTaskReward > 0 ? `，其中包含每日任务奖励 ${claimedTaskReward} 点。` : '。'}`;
+      promptAction.showToast({
+        message: `陪伴等级提升到 Lv.${this.companionProgress.level}`,
+        duration: 1600
+      });
+    } else {
+      this.latestClaimSummary = `本次领取 ${claimedAffinity} 点默契值${claimedTaskReward > 0 ? `，其中包含每日任务奖励 ${claimedTaskReward} 点。` : '。'}`;
+      promptAction.showToast({
+        message: `成功领取 ${claimedAffinity} 点默契值`,
+        duration: 1600
+      });
+    }
+    void this.saveStudyData();
+  }
+
+  addCompanionAffinity(value: number) {
+    if (value <= 0) {
+      return;
+    }
+    const nextTotalAffinity = this.companionProgress.totalAffinity + value;
+    const previousLevel = this.companionProgress.level;
+    this.companionProgress = this.buildCompanionProgress(nextTotalAffinity);
+    if (this.companionProgress.level > previousLevel) {
+      promptAction.showToast({
+        message: `陪伴等级提升到 Lv.${this.companionProgress.level}`,
+        duration: 1600
+      });
+    }
+  }
+
+  grantPendingAffinity(value: number) {
+    if (value <= 0) {
+      return;
+    }
+    this.pendingAffinity = this.pendingAffinity + value;
+  }
+
+  claimPendingAffinity() {
+    if (this.pendingAffinity <= 0) {
+      return;
+    }
+    const claimedAffinity = this.pendingAffinity;
+    const previousLevel = this.companionProgress.level;
+    this.companionProgress = this.buildCompanionProgress(this.companionProgress.totalAffinity + claimedAffinity);
+    this.pendingAffinity = 0;
+    if (this.companionProgress.level > previousLevel) {
+      promptAction.showToast({
+        message: `陪伴等级提升到 Lv.${this.companionProgress.level}`,
+        duration: 1600
+      });
+    } else {
+      promptAction.showToast({
+        message: `成功领取 ${claimedAffinity} 点默契值`,
+        duration: 1600
+      });
+    }
+    void this.saveStudyData();
+  }
+
   async ensurePreferences() {
     if (this.studyRoomPreferences !== null) {
       return this.studyRoomPreferences;
@@ -222,6 +454,20 @@ struct StudyRoom {
       this.dailyTomatoRecords = this.normalizeDailyTomatoRecords((await store.get('dailyTomatoRecords', '')) as string);
       this.syncTodayTomatoRecord();
       this.activeTodoId = Number((await store.get('activeTodoId', -1)) as number);
+      this.companionProgress = this.buildCompanionProgress(Number((await store.get('companionTotalAffinity', 0)) as number));
+      this.pendingAffinity = Number((await store.get('pendingAffinity', 0)) as number);
+      const savedCompanionTasks = (await store.get('companionDailyTasks', '')) as string;
+      if (savedDate === todayKey && savedCompanionTasks !== '') {
+        const parsedTasks = JSON.parse(savedCompanionTasks) as CompanionDailyTask[];
+        if (Array.isArray(parsedTasks) && parsedTasks.length > 0) {
+          this.companionDailyTasks = parsedTasks;
+        } else {
+          this.companionDailyTasks = this.buildDefaultCompanionDailyTasks();
+        }
+      } else {
+        this.companionDailyTasks = this.buildDefaultCompanionDailyTasks();
+      }
+      this.syncCompanionDailyTaskProgress();
       this.isLoggedIn = Boolean((await store.get('isLoggedIn', false)) as boolean);
       this.savedAccount = (await store.get('savedAccount', '')) as string;
       this.savedPassword = (await store.get('savedPassword', '')) as string;
@@ -277,6 +523,9 @@ struct StudyRoom {
       await store.put('lastActiveDate', this.lastActiveDate);
       await store.put('dailyTomatoRecords', JSON.stringify(this.dailyTomatoRecords));
       await store.put('activeTodoId', this.activeTodoId);
+      await store.put('companionTotalAffinity', this.companionProgress.totalAffinity);
+      await store.put('pendingAffinity', this.pendingAffinity);
+      await store.put('companionDailyTasks', JSON.stringify(this.companionDailyTasks));
       await store.put('isLoggedIn', this.isLoggedIn);
       await store.put('savedAccount', this.savedAccount);
       await store.put('savedPassword', this.savedPassword);
@@ -428,6 +677,40 @@ struct StudyRoom {
     ];
     this.activeTodoId = 1001;
     this.dailyTomatoRecords = this.buildMockDailyTomatoRecords();
+    this.pendingAffinity = 36;
+    this.companionDailyTasks = [
+      {
+        id: 'focus_once',
+        title: '完成一轮专注',
+        description: '去完成 1 轮专注番茄，和陪伴角色一起进入状态。',
+        reward: 12,
+        progress: 1,
+        target: 1,
+        completed: true,
+        claimed: false
+      },
+      {
+        id: 'focus_twice',
+        title: '完成两轮专注',
+        description: '今天再多完成 2 轮专注，默契会提升得更快。',
+        reward: 18,
+        progress: 2,
+        target: 2,
+        completed: true,
+        claimed: false
+      },
+      {
+        id: 'finish_todo',
+        title: '完成一个学习任务',
+        description: '把一项学习清单真正做完，陪伴角色会更认可你。',
+        reward: 25,
+        progress: 1,
+        target: 1,
+        completed: true,
+        claimed: false
+      }
+    ];
+    this.latestClaimSummary = '完成任务和番茄后，奖励会先累积到待领取区域。';
     this.refreshStatsView();
   }
 
@@ -548,7 +831,9 @@ struct StudyRoom {
       nextTodoList.push(item);
     });
     this.todoList = nextTodoList;
+    this.grantPendingAffinity(10);
     if (completedTaskName !== '') {
+      this.grantPendingAffinity(25);
       promptAction.showToast({ message: `任务「${completedTaskName}」已完成`, duration: 1600 });
     }
   }
@@ -859,8 +1144,10 @@ struct StudyRoom {
       this.tomatoCount = this.tomatoCount + 1;
       this.completedFocusSessions = this.completedFocusSessions + 1;
       this.totalTomatoCount = this.totalTomatoCount + 1;
+      this.grantPendingAffinity(12);
       this.syncTodayTomatoRecord();
       this.recordActiveTodoTomato();
+      this.syncCompanionDailyTaskProgress();
       this.refreshStatsView();
 
       const today = this.getTodayKey();
@@ -1015,6 +1302,7 @@ struct StudyRoom {
       this.activeTodoId = -1;
     }
     this.todoList = nextTodoList;
+    this.syncCompanionDailyTaskProgress();
     void this.saveStudyData();
   }
 
@@ -1427,7 +1715,20 @@ struct StudyRoom {
                 totalTomatoCount: this.totalTomatoCount,
                 todayTomatoCount: this.tomatoCount,
                 statsVersion: this.statsVersion,
-                animationName: 'cat_sleep.json'
+                animationName: 'cat_sleep.json',
+                companionProgress: this.companionProgress,
+                pendingAffinity: this.pendingAffinity,
+                dailyTasks: this.companionDailyTasks,
+                showLevelUpModal: this.showCompanionLevelUpModal,
+                unlockedStageTitle: this.unlockedStageTitle,
+                unlockedStageReward: this.unlockedStageReward,
+                latestClaimSummary: this.latestClaimSummary,
+                onClaimAffinity: () => {
+                  this.claimCompanionRewards();
+                },
+                onDismissLevelUp: () => {
+                  this.dismissCompanionLevelUpModal();
+                }
               })
             }
             .tabBar(this.buildTabBarItem('陪伴', 2))

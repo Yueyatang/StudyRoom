@@ -19,6 +19,24 @@ export interface DailyTomatoRecord {
   count: number;
 }
 
+export interface CompanionProgress {
+  level: number;
+  totalAffinity: number;
+  currentLevelAffinity: number;
+  nextLevelAffinity: number;
+}
+
+export interface CompanionDailyTask {
+  id: string;
+  title: string;
+  description: string;
+  reward: number;
+  progress: number;
+  target: number;
+  completed: boolean;
+  claimed: boolean;
+}
+
 export interface SceneData {
   name: string;
   bgColor: string;
