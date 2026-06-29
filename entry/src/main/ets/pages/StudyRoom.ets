@@ -89,6 +89,7 @@ struct StudyRoom {
   @State authConfirmPassword: string = '';
   @State savedAccount: string = '';
   @State savedPassword: string = '';
+  @State currentTabIndex: number = 0;
   @State profile: UserProfile = {
     nickname: '学习搭子',
     account: '',
@@ -911,7 +912,7 @@ struct StudyRoom {
           .justifyContent(FlexAlign.Center)
           .alignItems(HorizontalAlign.Center)
         } else {
-          Tabs({ barPosition: BarPosition.End }) {
+          Tabs({ barPosition: BarPosition.End, index: this.currentTabIndex }) {
             TabContent() {
               Scroll() {
                 Column() {
@@ -1023,7 +1024,7 @@ struct StudyRoom {
               .width('100%')
               .layoutWeight(1)
             }
-            .tabBar('📚 学习')
+            .tabBar(this.buildTabBarItem('学习', 0))
 
             TabContent() {
               Scroll() {
@@ -1056,7 +1057,7 @@ struct StudyRoom {
               .width('100%')
               .layoutWeight(1)
             }
-            .tabBar('✅ 清单')
+            .tabBar(this.buildTabBarItem('清单', 1))
 
             TabContent() {
               CompanionComponent({
@@ -1067,7 +1068,7 @@ struct StudyRoom {
                 animationName: 'cat_sleep.json'
               })
             }
-            .tabBar('🤝 陪伴')
+            .tabBar(this.buildTabBarItem('陪伴', 2))
 
             TabContent() {
               ProfileComponent({
@@ -1110,10 +1111,15 @@ struct StudyRoom {
                 }
               })
             }
-            .tabBar('👤 我的')
+            .tabBar(this.buildTabBarItem('我的', 3))
           }
           .width('100%')
           .layoutWeight(1)
+          .barHeight(56)
+          .barBackgroundColor('rgba(255,255,255,0.03)')
+          .onChange((index: number) => {
+            this.currentTabIndex = index;
+          })
         }
 
         Row() {
@@ -1144,6 +1150,29 @@ struct StudyRoom {
     }
     .width('100%')
     .height('100%')
+  }
+
+  @Builder
+  private buildTabBarItem(title: string, index: number) {
+    Column({ space: 5 }) {
+      Text(title)
+        .fontSize(13)
+        .fontWeight(this.currentTabIndex === index ? FontWeight.Bold : FontWeight.Medium)
+        .fontColor(this.currentTabIndex === index ? '#FFF2C2' : 'rgba(226,232,240,0.66)')
+        .textAlign(TextAlign.Center)
+
+      Row()
+        .width(this.currentTabIndex === index ? 18 : 4)
+        .height(3)
+        .backgroundColor(this.currentTabIndex === index ? '#FFD878' : 'rgba(255,255,255,0)')
+        .borderRadius(2)
+    }
+    .width(64)
+    .height(44)
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+    .backgroundColor(this.currentTabIndex === index ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0)')
+    .borderRadius(22)
   }
 
   @Builder
