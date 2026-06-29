@@ -1,17 +1,21 @@
 import { TodoItem } from '../common/StudyRoomTypes';
-import promptAction from '@ohos.promptAction';   // 新增导入
+import promptAction from '@ohos.promptAction';
 
 @Component
 export struct TodoComponent {
   @Prop todoList: TodoItem[] = [];
   @Prop newTodoText: string = '';
   @Prop showCompleted: boolean = false;
+  @Prop activeTodoId: number = -1;
+  @Prop isFocusRunning: boolean = false;
   onToggle: (index: number) => void = () => {};
   onDelete: (index: number) => void = () => {};
   onTextChange: (value: string) => void = () => {};
   onAdd: () => void = () => {};
   onToggleCompletedSection: () => void = () => {};
   onPin: (index: number) => void = () => {};
+  onSelectActive: (index: number) => void = () => {};
+  onAdjustEstimate: (index: number, delta: number) => void = () => {};
 
   getCompletedCount(): number {
     let count = 0;
@@ -45,6 +49,13 @@ export struct TodoComponent {
     } else {
       return '完美！你已超越自己！';
     }
+  }
+
+  getTomatoProgress(item: TodoItem): number {
+    if (item.estimatedTomatoes <= 0) {
+      return 0;
+    }
+    return Math.min(1, item.doneTomatoes / item.estimatedTomatoes);
   }
 
   getPendingIndexes(): number[] {
@@ -101,97 +112,150 @@ export struct TodoComponent {
 
   @Builder
   taskRow(item: TodoItem, index: number) {
-    Row() {
-      // 完成状态按钮
-      Stack({ alignContent: Alignment.Center }) {
-        Circle()
-          .width(26)
-          .height(26)
-          .stroke(item.completed ? '#FFD878' : 'rgba(255,255,255,0.3)')
-          .strokeWidth(2.5)
-          .fill(item.completed ? '#FFD878' : 'transparent')
+    Column({ space: 12 }) {
+      Row() {
+        Stack({ alignContent: Alignment.Center }) {
+          Circle()
+            .width(26)
+            .height(26)
+            .stroke(item.completed ? '#FFD878' : 'rgba(255,255,255,0.3)')
+            .strokeWidth(2.5)
+            .fill(item.completed ? '#FFD878' : 'transparent')
 
-        if (item.completed) {
-          Text('✓')
-            .fontSize(16)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#1B2431')
-        }
-      }
-      .width(26)
-      .height(26)
-      .onClick(() => {
-        this.onToggle(index);
-      })
-
-      // 任务文本
-      Column() {
-        Row() {
-          Text(item.text)
-            .fontSize(15)
-            .fontColor(item.completed ? 'rgba(196,202,208,0.5)' : '#F4F7FA')
-            .decoration({
-              type: item.completed ? TextDecorationType.LineThrough : TextDecorationType.None
-            })
-            .fontWeight(item.pinned && !item.completed ? FontWeight.Medium : FontWeight.Normal)
-
-          if (item.pinned && !item.completed) {
-            Text('置顶')
-              .fontSize(9)
-              .fontColor('#FFD878')
-              .padding({ left: 8, right: 8, top: 2, bottom: 2 })
-              .backgroundColor('rgba(255,216,120,0.15)')
-              .borderRadius(10)
-              .margin({ left: 8 })
+          if (item.completed) {
+            Text('✓')
+              .fontSize(16)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#1B2431')
           }
         }
+        .width(26)
+        .height(26)
+        .onClick(() => {
+          this.onToggle(index);
+        })
 
-        if (item.completed) {
-          Text('已完成')
+        Text(item.text)
+          .fontSize(16)
+          .fontColor(item.completed ? 'rgba(196,202,208,0.5)' : '#F4F7FA')
+          .decoration({
+            type: item.completed ? TextDecorationType.LineThrough : TextDecorationType.None
+          })
+          .fontWeight(item.pinned && !item.completed ? FontWeight.Bold : FontWeight.Medium)
+          .maxLines(1)
+          .layoutWeight(1)
+          .margin({ left: 12 })
+
+        if (item.pinned && !item.completed) {
+          Text('置顶')
             .fontSize(10)
-            .fontColor('rgba(196,202,208,0.4)')
-            .margin({ top: 2 })
+            .fontColor('#FFD878')
+            .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+            .backgroundColor('rgba(255,216,120,0.15)')
+            .borderRadius(10)
+        }
+
+          if (item.id === this.activeTodoId && !item.completed) {
+            Text(this.isFocusRunning ? '专注中' : '已选择')
+              .fontSize(10)
+              .fontColor(this.isFocusRunning ? '#9EE2FF' : '#FFD878')
+              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+              .backgroundColor(this.isFocusRunning ? 'rgba(158,226,255,0.14)' : 'rgba(255,216,120,0.14)')
+              .borderRadius(10)
+              .margin({ left: 6 })
+          }
+      }
+      .width('100%')
+
+      Row({ space: 10 }) {
+        Text(item.completed ? `已完成 ${item.doneTomatoes}/${item.estimatedTomatoes}` : `${item.doneTomatoes}/${item.estimatedTomatoes} 番茄`)
+          .fontSize(11)
+          .fontColor(item.completed ? 'rgba(196,202,208,0.42)' : 'rgba(255,255,255,0.56)')
+          .width(64)
+
+        Stack({ alignContent: Alignment.Start }) {
+          Row()
+            .width('100%')
+            .height(5)
+            .backgroundColor('rgba(255,255,255,0.10)')
+            .borderRadius(3)
+
+          Row()
+            .width(`${this.getTomatoProgress(item) * 100}%`)
+            .height(5)
+            .backgroundColor(item.completed ? 'rgba(255,216,120,0.45)' : '#FFD878')
+            .borderRadius(3)
+        }
+        .layoutWeight(1)
+        .height(5)
+
+        if (!item.completed) {
+          Button('-')
+            .fontSize(12)
+            .fontColor('rgba(255,255,255,0.66)')
+            .width(28)
+            .height(26)
+            .backgroundColor('rgba(255,255,255,0.07)')
+            .borderRadius(13)
+            .onClick(() => {
+              this.onAdjustEstimate(index, -1);
+            })
+
+          Button('+')
+            .fontSize(12)
+            .fontColor('rgba(255,255,255,0.78)')
+            .width(28)
+            .height(26)
+            .backgroundColor('rgba(255,255,255,0.07)')
+            .borderRadius(13)
+            .onClick(() => {
+              this.onAdjustEstimate(index, 1);
+            })
         }
       }
-      .layoutWeight(1)
-      .margin({ left: 12 })
-      .alignItems(HorizontalAlign.Start)
-      .onClick(() => {
-        if (!item.completed) {
-          this.onToggle(index);
-        }
-      })
+      .width('100%')
+      .alignItems(VerticalAlign.Center)
 
-      // 右侧操作按钮
-      Row() {
+      Row({ space: 8 }) {
         if (!item.completed) {
+          Button(item.id === this.activeTodoId ? (this.isFocusRunning ? '专注中' : '已选择') : '设为专注')
+            .fontSize(12)
+            .fontColor(item.id === this.activeTodoId ? (this.isFocusRunning ? '#9EE2FF' : '#FFD878') : '#EAF2F8')
+            .height(32)
+            .layoutWeight(1)
+            .backgroundColor(item.id === this.activeTodoId ? (this.isFocusRunning ? 'rgba(158,226,255,0.16)' : 'rgba(255,216,120,0.14)') : 'rgba(255,255,255,0.08)')
+            .borderRadius(16)
+            .onClick(() => {
+              this.onSelectActive(index);
+            })
+
           Button(item.pinned ? '取消置顶' : '置顶')
-            .fontSize(11)
-            .fontColor(item.pinned ? '#FFD878' : 'rgba(255,255,255,0.6)')
-            .height(30)
-            .padding({ left: 10, right: 10 })
-            .backgroundColor(item.pinned ? 'rgba(255,216,120,0.2)' : 'rgba(255,255,255,0.06)')
-            .borderRadius(15)
+            .fontSize(12)
+            .fontColor(item.pinned ? '#FFD878' : 'rgba(255,255,255,0.72)')
+            .height(32)
+            .layoutWeight(1)
+            .backgroundColor(item.pinned ? 'rgba(255,216,120,0.16)' : 'rgba(255,255,255,0.08)')
+            .borderRadius(16)
             .onClick(() => {
               this.onPin(index);
             })
         }
 
         Button('删除')
-          .fontSize(11)
-          .fontColor('rgba(255,255,255,0.5)')
-          .height(30)
-          .padding({ left: 10, right: 10 })
-          .backgroundColor('rgba(255,255,255,0.06)')
-          .borderRadius(15)
-          .margin({ left: 6 })
+          .fontSize(12)
+          .fontColor('rgba(255,255,255,0.58)')
+          .height(32)
+          .layoutWeight(1)
+          .backgroundColor('rgba(255,255,255,0.08)')
+          .borderRadius(16)
           .onClick(() => {
-            this.showDeleteConfirm(index);   // 弹窗确认后再删除
+            this.showDeleteConfirm(index);
           })
       }
+      .width('100%')
     }
     .width('100%')
-    .padding({ left: 14, right: 12, top: 10, bottom: 10 })
+    .padding({ left: 14, right: 14, top: 14, bottom: 14 })
     .backgroundColor(
       item.completed
         ? 'rgba(255,255,255,0.03)'

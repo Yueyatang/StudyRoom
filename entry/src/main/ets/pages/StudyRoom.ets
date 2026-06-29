@@ -63,6 +63,7 @@ struct StudyRoom {
   @State currentTime: string = '';
   @State todoList: TodoItem[] = [];
   @State newTodoText: string = '';
+  @State activeTodoId: number = -1;
   @State currentMode: TimerMode = 'focus';
   @State focusDuration: number = 25 * 60;
   @State shortBreakDuration: number = 5 * 60;
@@ -211,6 +212,7 @@ struct StudyRoom {
       this.lastActiveDate = (await store.get('lastActiveDate', '')) as string;
       this.dailyTomatoRecords = this.normalizeDailyTomatoRecords((await store.get('dailyTomatoRecords', '')) as string);
       this.syncTodayTomatoRecord();
+      this.activeTodoId = Number((await store.get('activeTodoId', -1)) as number);
       this.isLoggedIn = Boolean((await store.get('isLoggedIn', false)) as boolean);
       this.savedAccount = (await store.get('savedAccount', '')) as string;
       this.savedPassword = (await store.get('savedPassword', '')) as string;
@@ -231,10 +233,15 @@ struct StudyRoom {
               id: item.id ?? Date.now() + index,
               text: item.text,
               completed: item.completed,
-              pinned: item.pinned ?? false
+              pinned: item.pinned ?? false,
+              estimatedTomatoes: Math.max(1, Number(item.estimatedTomatoes ?? 1)),
+              doneTomatoes: Math.max(0, Number(item.doneTomatoes ?? 0))
             });
           });
           this.todoList = normalizedTodoList;
+          if (this.getActiveTodoIndex() === -1) {
+            this.activeTodoId = -1;
+          }
         } else {
           await this.initDefaultTodos();
         }
@@ -260,6 +267,7 @@ struct StudyRoom {
       await store.put('totalTomatoCount', this.totalTomatoCount);
       await store.put('lastActiveDate', this.lastActiveDate);
       await store.put('dailyTomatoRecords', JSON.stringify(this.dailyTomatoRecords));
+      await store.put('activeTodoId', this.activeTodoId);
       await store.put('isLoggedIn', this.isLoggedIn);
       await store.put('savedAccount', this.savedAccount);
       await store.put('savedPassword', this.savedPassword);
@@ -274,11 +282,20 @@ struct StudyRoom {
 
   async initDefaultTodos() {
     this.todoList = [
-      { id: 1, text: '阅读', completed: false, pinned: true },
-      { id: 2, text: '笔记整理', completed: false, pinned: false },
-      { id: 3, text: '复习巩固', completed: false, pinned: false }
+      { id: 1, text: '阅读', completed: false, pinned: true, estimatedTomatoes: 2, doneTomatoes: 0 },
+      { id: 2, text: '笔记整理', completed: false, pinned: false, estimatedTomatoes: 1, doneTomatoes: 0 },
+      { id: 3, text: '复习巩固', completed: false, pinned: false, estimatedTomatoes: 2, doneTomatoes: 0 }
     ];
     await this.saveStudyData();
+  }
+
+  getActiveTodoIndex(): number {
+    for (let index = 0; index < this.todoList.length; index++) {
+      if (this.todoList[index].id === this.activeTodoId && !this.todoList[index].completed) {
+        return index;
+      }
+    }
+    return -1;
   }
 
   normalizeDailyTomatoRecords(rawRecords: string): DailyTomatoRecord[] {
@@ -345,6 +362,39 @@ struct StudyRoom {
       });
     }
     return recentRecords;
+  }
+
+  recordActiveTodoTomato() {
+    const activeIndex = this.getActiveTodoIndex();
+    if (activeIndex === -1) {
+      return;
+    }
+    const nextTodoList: TodoItem[] = [];
+    let completedTaskName = '';
+    this.todoList.forEach((item: TodoItem, index: number) => {
+      if (index === activeIndex) {
+        const nextDoneTomatoes = item.doneTomatoes + 1;
+        const nextCompleted = nextDoneTomatoes >= item.estimatedTomatoes;
+        if (nextCompleted) {
+          completedTaskName = item.text;
+          this.activeTodoId = -1;
+        }
+        nextTodoList.push({
+          id: item.id,
+          text: item.text,
+          completed: nextCompleted,
+          pinned: item.pinned,
+          estimatedTomatoes: item.estimatedTomatoes,
+          doneTomatoes: nextDoneTomatoes
+        });
+        return;
+      }
+      nextTodoList.push(item);
+    });
+    this.todoList = nextTodoList;
+    if (completedTaskName !== '') {
+      promptAction.showToast({ message: `任务「${completedTaskName}」已完成`, duration: 1600 });
+    }
   }
 
   async setMusicEnabled(enable: boolean) {
@@ -637,6 +687,7 @@ struct StudyRoom {
       this.completedFocusSessions = this.completedFocusSessions + 1;
       this.totalTomatoCount = this.totalTomatoCount + 1;
       this.syncTodayTomatoRecord();
+      this.recordActiveTodoTomato();
       this.refreshStatsView();
 
       const today = this.getTodayKey();
@@ -780,21 +831,30 @@ struct StudyRoom {
         id: item.id,
         text: item.text,
         completed: itemIndex === index ? !item.completed : item.completed,
-        pinned: item.pinned
+        pinned: item.pinned,
+        estimatedTomatoes: item.estimatedTomatoes,
+        doneTomatoes: item.doneTomatoes
       });
     });
+    if (this.todoList[index].id === this.activeTodoId) {
+      this.activeTodoId = -1;
+    }
     this.todoList = nextTodoList;
     void this.saveStudyData();
   }
 
   deleteTodo(index: number) {
     const nextTodoList: TodoItem[] = [];
+    const deletedTodoId = this.todoList[index].id;
     this.todoList.forEach((item: TodoItem, itemIndex: number) => {
       if (itemIndex !== index) {
         nextTodoList.push(item);
       }
     });
     this.todoList = nextTodoList;
+    if (deletedTodoId === this.activeTodoId) {
+      this.activeTodoId = -1;
+    }
     void this.saveStudyData();
   }
 
@@ -805,10 +865,53 @@ struct StudyRoom {
         id: item.id,
         text: item.text,
         completed: item.completed,
-        pinned: itemIndex === index ? !item.pinned : item.pinned
+        pinned: itemIndex === index ? !item.pinned : item.pinned,
+        estimatedTomatoes: item.estimatedTomatoes,
+        doneTomatoes: item.doneTomatoes
       });
     });
     this.todoList = nextTodoList;
+    void this.saveStudyData();
+  }
+
+  selectActiveTodo(index: number) {
+    if (index < 0 || index >= this.todoList.length || this.todoList[index].completed) {
+      return;
+    }
+    this.activeTodoId = this.todoList[index].id;
+    this.currentTabIndex = 0;
+    if (this.currentMode !== 'focus') {
+      this.switchMode('focus');
+    }
+    this.startTimer();
+    void this.saveStudyData();
+    promptAction.showToast({ message: `开始专注：${this.todoList[index].text}`, duration: 1200 });
+  }
+
+  adjustTodoEstimate(index: number, delta: number) {
+    if (index < 0 || index >= this.todoList.length) {
+      return;
+    }
+    const nextTodoList: TodoItem[] = [];
+    this.todoList.forEach((item: TodoItem, itemIndex: number) => {
+      if (itemIndex === index) {
+        const nextEstimate = Math.max(1, Math.min(12, item.estimatedTomatoes + delta));
+        nextTodoList.push({
+          id: item.id,
+          text: item.text,
+          completed: item.doneTomatoes >= nextEstimate,
+          pinned: item.pinned,
+          estimatedTomatoes: nextEstimate,
+          doneTomatoes: item.doneTomatoes
+        });
+        return;
+      }
+      nextTodoList.push(item);
+    });
+    this.todoList = nextTodoList;
+    if (this.getActiveTodoIndex() === -1) {
+      this.activeTodoId = -1;
+    }
     void this.saveStudyData();
   }
 
@@ -829,7 +932,9 @@ struct StudyRoom {
       id: Date.now(),
       text: trimmedText,
       completed: false,
-      pinned: false
+      pinned: false,
+      estimatedTomatoes: 1,
+      doneTomatoes: 0
     });
     this.todoList = nextTodoList;
     this.newTodoText = '';
@@ -1074,6 +1179,8 @@ struct StudyRoom {
                     }
                   })
 
+                  this.buildActiveTodoCard()
+
                   StatsComponent({
                     todayTomatoCount: this.tomatoCount,
                     totalFocusMinutes: this.getTotalFocusMinutes(),
@@ -1104,6 +1211,8 @@ struct StudyRoom {
                   todoList: this.todoList,
                   newTodoText: this.newTodoText,
                   showCompleted: this.showCompletedTodos,
+                  activeTodoId: this.activeTodoId,
+                  isFocusRunning: this.isRunning,
                   onToggle: (index: number) => {
                     this.toggleTodo(index);
                   },
@@ -1121,6 +1230,12 @@ struct StudyRoom {
                   },
                   onPin: (index: number) => {
                     this.pinTodo(index);
+                  },
+                  onSelectActive: (index: number) => {
+                    this.selectActiveTodo(index);
+                  },
+                  onAdjustEstimate: (index: number, delta: number) => {
+                    this.adjustTodoEstimate(index, delta);
                   }
                 })
               }
@@ -1245,6 +1360,111 @@ struct StudyRoom {
     .alignItems(HorizontalAlign.Center)
     .backgroundColor(this.currentTabIndex === index ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0)')
     .borderRadius(22)
+  }
+
+  @Builder
+  private buildActiveTodoCard() {
+    if (this.getActiveTodoIndex() !== -1) {
+      Column({ space: 12 }) {
+        Row() {
+          Column({ space: 6 }) {
+            Text('当前专注任务')
+              .fontSize(12)
+              .fontColor('rgba(255,255,255,0.56)')
+
+            Text(this.todoList[this.getActiveTodoIndex()].text)
+              .fontSize(16)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#FFFFFF')
+              .maxLines(1)
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+
+          Text(`${this.todoList[this.getActiveTodoIndex()].doneTomatoes}/${this.todoList[this.getActiveTodoIndex()].estimatedTomatoes} 番茄`)
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('#FFD878')
+            .padding({ left: 12, right: 12, top: 7, bottom: 7 })
+            .backgroundColor('rgba(255,216,120,0.14)')
+            .borderRadius(16)
+        }
+        .width('100%')
+
+        Row() {
+          Column({ space: 4 }) {
+            Text(this.currentMode === 'focus' ? '本轮倒计时' : this.getModeLabel(this.currentMode))
+              .fontSize(11)
+              .fontColor('rgba(255,255,255,0.52)')
+
+            Text(this.timerDisplay)
+              .fontSize(24)
+              .fontWeight(FontWeight.Bold)
+              .fontFamily('monospace')
+              .fontColor('#FFFFFF')
+          }
+          .layoutWeight(1)
+          .alignItems(HorizontalAlign.Start)
+
+          if (this.isRunning) {
+            Text('进行中')
+              .fontSize(12)
+              .fontColor('#9EE2FF')
+              .padding({ left: 12, right: 12, top: 7, bottom: 7 })
+              .backgroundColor('rgba(158,226,255,0.14)')
+              .borderRadius(16)
+          } else {
+            Button('开始')
+              .fontSize(12)
+              .fontColor('#1A2432')
+              .height(32)
+              .padding({ left: 16, right: 16 })
+              .backgroundColor('#FFD878')
+              .borderRadius(16)
+              .onClick(() => {
+                this.startTimer();
+              })
+          }
+        }
+        .width('100%')
+      }
+      .width('90%')
+      .padding({ left: 16, right: 16, top: 14, bottom: 14 })
+      .backgroundColor('rgba(22,28,38,0.62)')
+      .borderRadius(24)
+      .margin({ bottom: 12 })
+    } else {
+      Row() {
+        Column({ space: 6 }) {
+          Text('未选择专注任务')
+            .fontSize(15)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#FFFFFF')
+
+          Text('完成番茄后可自动累计到任务进度')
+            .fontSize(12)
+            .fontColor('rgba(255,255,255,0.56)')
+        }
+        .layoutWeight(1)
+        .alignItems(HorizontalAlign.Start)
+
+        Button('去选择')
+          .fontSize(12)
+          .fontColor('#1A2432')
+          .height(32)
+          .padding({ left: 14, right: 14 })
+          .backgroundColor('#FFD878')
+          .borderRadius(16)
+          .onClick(() => {
+            this.currentTabIndex = 1;
+          })
+      }
+      .width('90%')
+      .padding({ left: 16, right: 16, top: 14, bottom: 14 })
+      .backgroundColor('rgba(22,28,38,0.42)')
+      .borderRadius(24)
+      .margin({ bottom: 12 })
+    }
   }
 
   @Builder

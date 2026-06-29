@@ -3,6 +3,8 @@ export interface TodoItem {
   text: string;
   completed: boolean;
   pinned: boolean;
+  estimatedTomatoes: number;
+  doneTomatoes: number;
 }
 
 export interface UserProfile {
