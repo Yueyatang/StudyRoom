@@ -93,6 +93,7 @@ struct StudyRoom {
   @State savedAccount: string = '';
   @State savedPassword: string = '';
   @State currentTabIndex: number = 0;
+  @State currentVideoIndex: number = 0;
   @State profile: UserProfile = {
     nickname: '学习搭子',
     account: '',
@@ -115,6 +116,9 @@ struct StudyRoom {
   private studyRoomPreferences: preferences.Preferences | null = null;
   private readonly preferencesName: string = 'study_room_preferences';
   private readonly enableMockData: boolean = true;
+  private isImmersionModeActive: boolean = false;
+  private isMusicDucked: boolean = false;
+  private readonly immersionVideoList: string[] = ['nearwindows_study.mp4', 'rain_study.mp4', 'only_study.mp4'];
 
   async aboutToAppear() {
     await this.loadData();
@@ -317,6 +321,45 @@ struct StudyRoom {
       return '';
     }
     return `${this.todoList[activeIndex].doneTomatoes}/${this.todoList[activeIndex].estimatedTomatoes} 番茄`;
+  }
+
+  getCurrentVideoName(): string {
+    if (this.currentVideoIndex < 0 || this.currentVideoIndex >= this.immersionVideoList.length) {
+      return this.immersionVideoList[0];
+    }
+    return this.immersionVideoList[this.currentVideoIndex];
+  }
+
+  switchImmersionVideo(index: number) {
+    if (index < 0 || index >= this.immersionVideoList.length || index === this.currentVideoIndex) {
+      return;
+    }
+    this.currentVideoIndex = index;
+  }
+
+  private applyMusicDuckState() {
+    if (this.musicPlayer === null) {
+      return;
+    }
+    if (!this.musicEnabled) {
+      return;
+    }
+    try {
+      this.musicPlayer.setVolume(this.isImmersionModeActive ? 0.22 : 1);
+      this.isMusicDucked = this.isImmersionModeActive;
+    } catch (error) {
+      console.error(`[StudyRoomMusic] duck volume failed: ${JSON.stringify(error)}`);
+    }
+  }
+
+  private handleTabModeChange(index: number) {
+    this.currentTabIndex = index;
+    const shouldEnableImmersionMode = index === 3;
+    if (this.isImmersionModeActive === shouldEnableImmersionMode) {
+      return;
+    }
+    this.isImmersionModeActive = shouldEnableImmersionMode;
+    this.applyMusicDuckState();
   }
 
   applyMockData() {
@@ -553,6 +596,7 @@ struct StudyRoom {
         console.error(`[StudyRoomMusic] player error: ${JSON.stringify(error)}`);
       });
       await this.updateSceneMusic();
+      this.applyMusicDuckState();
     } catch (error) {
       console.error(`[StudyRoomMusic] init failed: ${JSON.stringify(error)}`);
     }
@@ -711,6 +755,7 @@ struct StudyRoom {
       await this.waitForMusicState('initialized');
       await this.musicPlayer.prepare();
       await this.waitForMusicState('prepared');
+      this.applyMusicDuckState();
       await this.musicPlayer.play();
       await this.waitForMusicState('playing');
       this.activeMusicName = targetMusic;
@@ -1394,7 +1439,13 @@ struct StudyRoom {
                 currentSceneName: this.getCurrentScene().name,
                 suggestion: this.getCurrentScene().suggestion,
                 activeTaskText: this.getActiveTodoText(),
-                activeTaskProgress: this.getActiveTodoProgressText()
+                activeTaskProgress: this.getActiveTodoProgressText(),
+                currentVideoName: this.getCurrentVideoName(),
+                currentVideoIndex: this.currentVideoIndex,
+                videoList: this.immersionVideoList,
+                onVideoChange: (index: number) => {
+                  this.switchImmersionVideo(index);
+                }
               })
             }
             .tabBar(this.buildTabBarItem('沉浸', 3))
@@ -1447,7 +1498,7 @@ struct StudyRoom {
           .barHeight(56)
           .barBackgroundColor('rgba(255,255,255,0.03)')
           .onChange((index: number) => {
-            this.currentTabIndex = index;
+            this.handleTabModeChange(index);
           })
         }
 
