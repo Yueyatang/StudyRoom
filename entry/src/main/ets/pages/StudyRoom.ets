@@ -8,7 +8,7 @@ import { CompanionComponent } from '../components/CompanionComponent';
 import { AuthComponent } from '../components/AuthComponent';
 import { ProfileComponent } from '../components/ProfileComponent';
 import { StatsComponent } from '../components/StatsComponent';
-import { AuthMode, SceneData, TimerMode, TodoItem, UserProfile } from '../common/StudyRoomTypes';
+import { AuthMode, DailyTomatoRecord, SceneData, TimerMode, TodoItem, UserProfile } from '../common/StudyRoomTypes';
 
 @Entry
 @Component
@@ -80,6 +80,7 @@ struct StudyRoom {
   @State totalTomatoCount: number = 0;
   @State lastActiveDate: string = '';
   @State statsVersion: number = 0;
+  @State dailyTomatoRecords: DailyTomatoRecord[] = [];
 
   @State isLoggedIn: boolean = false;
   @State authMode: AuthMode = 'login';
@@ -208,6 +209,8 @@ struct StudyRoom {
       this.continuousDays = Number((await store.get('continuousDays', 0)) as number);
       this.totalTomatoCount = Number((await store.get('totalTomatoCount', 0)) as number);
       this.lastActiveDate = (await store.get('lastActiveDate', '')) as string;
+      this.dailyTomatoRecords = this.normalizeDailyTomatoRecords((await store.get('dailyTomatoRecords', '')) as string);
+      this.syncTodayTomatoRecord();
       this.isLoggedIn = Boolean((await store.get('isLoggedIn', false)) as boolean);
       this.savedAccount = (await store.get('savedAccount', '')) as string;
       this.savedPassword = (await store.get('savedPassword', '')) as string;
@@ -256,6 +259,7 @@ struct StudyRoom {
       await store.put('continuousDays', this.continuousDays);
       await store.put('totalTomatoCount', this.totalTomatoCount);
       await store.put('lastActiveDate', this.lastActiveDate);
+      await store.put('dailyTomatoRecords', JSON.stringify(this.dailyTomatoRecords));
       await store.put('isLoggedIn', this.isLoggedIn);
       await store.put('savedAccount', this.savedAccount);
       await store.put('savedPassword', this.savedPassword);
@@ -275,6 +279,72 @@ struct StudyRoom {
       { id: 3, text: '复习巩固', completed: false, pinned: false }
     ];
     await this.saveStudyData();
+  }
+
+  normalizeDailyTomatoRecords(rawRecords: string): DailyTomatoRecord[] {
+    if (rawRecords === '') {
+      return [];
+    }
+    try {
+      const parsed = JSON.parse(rawRecords) as DailyTomatoRecord[];
+      if (!Array.isArray(parsed)) {
+        return [];
+      }
+      const normalizedRecords: DailyTomatoRecord[] = [];
+      parsed.forEach((item: DailyTomatoRecord) => {
+        if (item.date !== undefined && item.date !== '') {
+          normalizedRecords.push({
+            date: item.date,
+            count: Math.max(0, Number(item.count ?? 0))
+          });
+        }
+      });
+      return normalizedRecords;
+    } catch (error) {
+      return [];
+    }
+  }
+
+  syncTodayTomatoRecord() {
+    const todayKey = this.getTodayKey();
+    let hasToday = false;
+    this.dailyTomatoRecords = this.dailyTomatoRecords.map((item: DailyTomatoRecord) => {
+      if (item.date === todayKey) {
+        hasToday = true;
+        return {
+          date: item.date,
+          count: this.tomatoCount
+        };
+      }
+      return item;
+    });
+    if (!hasToday) {
+      this.dailyTomatoRecords.push({
+        date: todayKey,
+        count: this.tomatoCount
+      });
+    }
+    this.dailyTomatoRecords = this.dailyTomatoRecords.slice(-120);
+  }
+
+  getRecentTomatoRecords(): DailyTomatoRecord[] {
+    const recentRecords: DailyTomatoRecord[] = [];
+    for (let offset = 69; offset >= 0; offset--) {
+      const date = new Date();
+      date.setDate(date.getDate() - offset);
+      const dateKey = this.getDateKey(date);
+      let count = 0;
+      this.dailyTomatoRecords.forEach((item: DailyTomatoRecord) => {
+        if (item.date === dateKey) {
+          count = item.count;
+        }
+      });
+      recentRecords.push({
+        date: dateKey,
+        count: count
+      });
+    }
+    return recentRecords;
   }
 
   async setMusicEnabled(enable: boolean) {
@@ -566,6 +636,7 @@ struct StudyRoom {
       this.tomatoCount = this.tomatoCount + 1;
       this.completedFocusSessions = this.completedFocusSessions + 1;
       this.totalTomatoCount = this.totalTomatoCount + 1;
+      this.syncTodayTomatoRecord();
       this.refreshStatsView();
 
       const today = this.getTodayKey();
@@ -1009,6 +1080,7 @@ struct StudyRoom {
                     continuousDays: this.continuousDays,
                     totalTomatoCount: this.totalTomatoCount,
                     targetTomatoes: this.profile.targetTomatoes,
+                    contributionDays: this.getRecentTomatoRecords(),
                     statsVersion: this.statsVersion
                   })
 

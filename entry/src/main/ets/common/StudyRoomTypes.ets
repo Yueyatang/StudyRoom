@@ -12,6 +12,11 @@ export interface UserProfile {
   targetTomatoes: number;
 }
 
+export interface DailyTomatoRecord {
+  date: string;
+  count: number;
+}
+
 export interface SceneData {
   name: string;
   bgColor: string;
