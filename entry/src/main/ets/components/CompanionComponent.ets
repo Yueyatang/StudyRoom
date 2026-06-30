@@ -29,6 +29,7 @@ export struct CompanionComponent {
   @Prop unlockedStageTitle: string = '';
   @Prop unlockedStageReward: string = '';
   @Prop latestClaimSummary: string = '';
+  @Prop accentColor: string = '#FFD878';
   onClaimTaskReward: (taskId: string) => void = () => {};
   onGoToTask: (taskId: string) => void = () => {};
   onDismissLevelUp: () => void = () => {};
@@ -42,32 +43,35 @@ export struct CompanionComponent {
   @State currentTalkLine: string = '';
   @State talkBubbleVisible: boolean = false;
   @State talkBubbleOpacity: number = 0;
-  @State talkBubbleScale: number = 0.92;
+  @State talkBubbleScale: number = 0.9;
+  @State petScale: number = 1;
 
   private readonly stages: CompanionStage[] = [
     {
       level: 1,
       title: '初遇陪伴',
-      subtitle: '小猫刚住进自习室，正悄悄观察主人的学习节奏。',
-      hint: '主人别急，我会乖乖陪你把今天的小目标做完喵。',
+      subtitle: '小猫刚住进你的学习空间，正悄悄观察主人的认真模样。',
+      hint: '主人别着急，我会乖乖陪你把今天的小目标完成喵。',
       unlockText: '解锁基础陪伴动作',
       animationName: 'cat_sleep.json',
       accentColor: '#FFD29A',
       glowColor: 'rgba(255, 210, 154, 0.32)',
       badgeText: 'Lv.1 初遇',
-      skinName: '奶油猫',
+      skinName: '奶油猫猫',
       talkLines: [
-        '主人摸摸我，再学一小会儿好不好喵？',
-        '我会安静陪着你，你只管认真看书喵。',
-        '今天也一起把小目标慢慢做完吧喵。'
+        '摸摸我之后，也要继续专心学习喵。',
+        '我会安静陪着你，你认真看书就好喵。',
+        '今天也一起把小目标慢慢做完吧，主人喵。',
+        '主人别分心呀，我把尾巴借你当书签喵。',
+        '你坐下来学习的时候，我就觉得今天会很棒喵。'
       ]
     },
     {
       level: 2,
       title: '熟悉陪学',
-      subtitle: '你们渐渐熟起来了，小猫会用小动作悄悄回应你。',
-      hint: '你一专心，我就想再靠近一点点喵。',
-      unlockText: '解锁抖耳回应动作',
+      subtitle: '你们慢慢熟悉起来了，小猫会用小动作回应主人的努力。',
+      hint: '你一专心，我就想离你更近一点点喵。',
+      unlockText: '解锁抖耳朵动作',
       animationName: 'black_cat_shake_ear.json',
       accentColor: '#B7C4D6',
       glowColor: 'rgba(183, 196, 214, 0.24)',
@@ -75,8 +79,10 @@ export struct CompanionComponent {
       skinName: '黑猫皮肤',
       talkLines: [
         '主人刚刚那一下好认真，我都看见啦喵。',
-        '再坚持一下下，我想看你完成这一轮喵。',
-        '你这么努力，我也会更乖一点喵。'
+        '再坚持一会儿，我想看你完成这一轮喵。',
+        '你这么努力，我也会更乖一点陪你喵。',
+        '我耳朵都竖起来啦，因为主人状态超好喵。',
+        '再学一点点，我就奖励你一个猫猫蹭蹭喵。'
       ]
     },
     {
@@ -93,7 +99,9 @@ export struct CompanionComponent {
       talkLines: [
         '别担心难题，我会一直在旁边守着你喵。',
         '你认真学习的样子，让猫猫很安心喵。',
-        '安静一点没关系，我知道你正在变厉害喵。'
+        '安静一点没关系，我知道你正在变厉害喵。',
+        '这一页翻过去，主人又会进步一点点喵。',
+        '你专心的时候，连空气都变得乖乖的喵。'
       ]
     },
     {
@@ -110,7 +118,9 @@ export struct CompanionComponent {
       talkLines: [
         '主人今天超棒，再来一轮也没问题喵。',
         '我已经准备好继续陪你冲刺啦喵。',
-        '做完这项任务，我就给你一个猫猫夸夸喵。'
+        '做完这项任务，我就给你一个猫猫夸夸喵。',
+        '冲呀主人，我已经替你把学习氛围踩热了喵。',
+        '你的认真正在发光，我都想围着你转圈喵。'
       ]
     },
     {
@@ -127,7 +137,9 @@ export struct CompanionComponent {
       talkLines: [
         '你一翻书，我就知道今天又要变厉害了喵。',
         '主人别急，慢慢来，我会一直守着你喵。',
-        '今天的认真，我都替你悄悄记下来啦喵。'
+        '今天的认真，我都替你悄悄记下来了喵。',
+        '如果累了就看看我，我们再一起稳稳学下去喵。',
+        '主人今天的节奏很好，猫猫给你点头认可喵。'
       ]
     },
     {
@@ -144,7 +156,9 @@ export struct CompanionComponent {
       talkLines: [
         '主人是我最喜欢的学习搭子喵。',
         '再摸摸我吧，摸完继续学习会更顺喵。',
-        '你努力的每一小步，猫猫都会给你鼓掌喵。'
+        '你努力的每一小步，猫猫都会给你鼓掌喵。',
+        '我已经是主人的专属陪学猫啦，要一起赢下今天喵。',
+        '等你学完这一段，我就把今天的夸夸全送给你喵。'
       ]
     }
   ];
@@ -160,7 +174,6 @@ export struct CompanionComponent {
   private talkHideTimer: number = -1;
   private catSoundPlayer: media.AVPlayer | null = null;
   private catSoundState: media.AVPlayerState = 'idle';
-  private catSoundName: string = '';
   private isPreparingCatSound: boolean = false;
 
   aboutToAppear(): void {
@@ -171,10 +184,7 @@ export struct CompanionComponent {
 
   aboutToDisappear(): void {
     this.destroyAnimation();
-    if (this.talkHideTimer !== -1) {
-      clearTimeout(this.talkHideTimer);
-      this.talkHideTimer = -1;
-    }
+    this.hideTalkBubbleImmediately();
     void this.releaseCatSoundPlayer();
   }
 
@@ -209,7 +219,7 @@ export struct CompanionComponent {
 
   private getAffinityProgressText(): string {
     if (this.companionProgress.level >= 6) {
-      return '你们已经到达最高陪伴等级啦。';
+      return '你们已经达到最高陪伴等级啦。';
     }
     const remain: number = Math.max(0, this.companionProgress.nextLevelAffinity - this.companionProgress.currentLevelAffinity);
     return `再获得 ${remain} 点默契值，就能解锁下一阶段喵。`;
@@ -220,31 +230,51 @@ export struct CompanionComponent {
     return stage.animationName === '' ? this.animationName : stage.animationName;
   }
 
-  private getTaskProgressText(task: CompanionDailyTask): string {
-    const claimableCount = this.getClaimableCount(task);
-    if (claimableCount > 0) {
-      return `可领取 ${claimableCount} 次`;
-    }
-    if (task.claimedCount > 0) {
-      return `已完成 ${task.progress} 次`;
-    }
-    return `${task.progress}/${task.target}`;
-  }
-
   private getClaimableCount(task: CompanionDailyTask): number {
     const available = Math.floor(task.progress / task.target) - task.claimedCount;
     return Math.max(0, available);
   }
 
+  private getTaskProgressText(task: CompanionDailyTask): string {
+    const claimableCount = this.getClaimableCount(task);
+    const cycleProgress = task.progress - task.claimedCount * task.target;
+    const currentCycleProgress = Math.max(0, cycleProgress);
+    if (claimableCount > 0) {
+      return `已达成 ${task.progress}/${task.target}，可领取 ${claimableCount} 次`;
+    }
+    if (task.claimedCount > 0) {
+      const remainToClaim = Math.max(0, task.target - currentCycleProgress);
+      return `本轮 ${currentCycleProgress}/${task.target}，再完成 ${remainToClaim} 次可领取`;
+    }
+    return `当前 ${currentCycleProgress}/${task.target}，再完成 ${Math.max(0, task.target - currentCycleProgress)} 次可领取`;
+  }
+
   private getTaskStatusText(task: CompanionDailyTask): string {
+    if (task.id === 'daily_login' && task.progress <= 0 && task.claimedCount <= 0) {
+      return '去打卡';
+    }
     const claimableCount = this.getClaimableCount(task);
     if (claimableCount > 0) {
       return '领取';
+    }
+    if (task.id === 'daily_login' && task.claimedCount > 0) {
+      return '已完成';
     }
     if (task.claimedCount > 0) {
       return '已完成·可继续';
     }
     return '去完成';
+  }
+
+  private shouldNavigateTask(task: CompanionDailyTask): boolean {
+    if (task.id === 'daily_login' && task.claimedCount > 0 && !this.canClaimTask(task)) {
+      return false;
+    }
+    return true;
+  }
+
+  private shouldDirectClaimDailyLogin(task: CompanionDailyTask): boolean {
+    return task.id === 'daily_login' && task.progress <= 0 && task.claimedCount <= 0;
   }
 
   private canClaimTask(task: CompanionDailyTask): boolean {
@@ -260,7 +290,7 @@ export struct CompanionComponent {
 
   private getTaskButtonBackground(task: CompanionDailyTask): string {
     if (this.canClaimTask(task)) {
-      return '#FFD878';
+      return this.accentColor;
     }
     if (task.claimedCount > 0) {
       return 'rgba(126,223,167,0.18)';
@@ -271,7 +301,7 @@ export struct CompanionComponent {
   private hideTalkBubbleImmediately(): void {
     this.talkBubbleVisible = false;
     this.talkBubbleOpacity = 0;
-    this.talkBubbleScale = 0.92;
+    this.talkBubbleScale = 0.9;
     if (this.talkHideTimer !== -1) {
       clearTimeout(this.talkHideTimer);
       this.talkHideTimer = -1;
@@ -281,7 +311,7 @@ export struct CompanionComponent {
   private showTalkBubble(): void {
     this.talkBubbleVisible = true;
     this.talkBubbleOpacity = 0;
-    this.talkBubbleScale = 0.92;
+    this.talkBubbleScale = 0.9;
     animateTo({ duration: 220, curve: Curve.EaseOut }, () => {
       this.talkBubbleOpacity = 1;
       this.talkBubbleScale = 1;
@@ -292,13 +322,13 @@ export struct CompanionComponent {
     this.talkHideTimer = setTimeout(() => {
       animateTo({ duration: 180, curve: Curve.EaseIn }, () => {
         this.talkBubbleOpacity = 0;
-        this.talkBubbleScale = 0.94;
+        this.talkBubbleScale = 0.95;
       });
       this.talkHideTimer = setTimeout(() => {
         this.talkBubbleVisible = false;
         this.talkHideTimer = -1;
       }, 200) as number;
-    }, 2400) as number;
+    }, 2200) as number;
   }
 
   private async pickTalkLine(): Promise<void> {
@@ -306,6 +336,12 @@ export struct CompanionComponent {
     const randomIndex: number = Math.floor(Math.random() * stage.talkLines.length);
     this.currentTalkLine = stage.talkLines[randomIndex];
     this.showTalkBubble();
+    animateTo({ duration: 120, curve: Curve.EaseOut }, () => {
+      this.petScale = 1.06;
+    });
+    animateTo({ duration: 180, delay: 120, curve: Curve.EaseInOut }, () => {
+      this.petScale = 1;
+    });
     await this.playRandomCatSound();
   }
 
@@ -408,7 +444,6 @@ export struct CompanionComponent {
     this.isPreparingCatSound = true;
     try {
       const soundName: string = this.catSounds[Math.floor(Math.random() * this.catSounds.length)];
-      this.catSoundName = soundName;
       await this.stopCatSoundPlayback();
       const rawFd = await getContext(this).resourceManager.getRawFd(soundName);
       this.catSoundPlayer.fdSrc = {
@@ -468,18 +503,19 @@ export struct CompanionComponent {
           .fontSize(28)
           .fontWeight(FontWeight.Bold)
           .fontColor('#FFFFFF')
-          .width('100%')
+          .width('90%')
           .textAlign(TextAlign.Start)
+          .margin({ top: 24 })
 
         Text(stage.subtitle)
           .fontSize(14)
           .fontColor('rgba(255,255,255,0.72)')
-          .width('100%')
+          .width('90%')
           .textAlign(TextAlign.Start)
           .lineHeight(22)
       }
-      .width('90%')
-      .margin({ top: 24 })
+      .width('100%')
+      .alignItems(HorizontalAlign.Center)
 
       Column({ space: 14 }) {
         Row() {
@@ -492,7 +528,7 @@ export struct CompanionComponent {
 
           Text(`${this.companionProgress.currentLevelAffinity}/${this.companionProgress.nextLevelAffinity} 默契值`)
             .fontSize(12)
-            .fontColor(stage.accentColor)
+            .fontColor(this.accentColor)
         }
         .width('100%')
 
@@ -506,7 +542,7 @@ export struct CompanionComponent {
           Row()
             .width(`${this.getAffinityProgress() * 100}%`)
             .height(8)
-            .backgroundColor(stage.accentColor)
+            .backgroundColor(this.accentColor)
             .borderRadius(4)
         }
         .width('100%')
@@ -520,86 +556,84 @@ export struct CompanionComponent {
       .width('90%')
       .padding({ left: 16, right: 16, top: 16, bottom: 16 })
       .backgroundColor('rgba(255,255,255,0.08)')
-      .borderRadius(24)
-
-      Column() {
-        Stack() {
-          Column()
-            .width('100%')
-            .height(340)
-            .borderRadius(32)
-            .linearGradient({
-              angle: 180,
-              colors: [
-                [stage.glowColor, 0],
-                ['rgba(255,255,255,0.05)', 1]
-              ]
-            })
-
-          Canvas(this.canvasRenderingContext)
-            .width(280)
-            .height(280)
-            .backgroundColor('rgba(255,255,255,0.03)')
-            .margin({ top: 30 })
-            .onClick(() => {
-              void this.pickTalkLine();
-            })
-            .onReady(() => {
-              this.canvasRenderingContext.imageSmoothingEnabled = true;
-              this.canvasRenderingContext.imageSmoothingQuality = 'medium';
-              this.currentLoadedAnimation = '';
-              void this.loadAnimation();
-            })
-
-          if (this.talkBubbleVisible && this.currentTalkLine !== '') {
-            Column() {
-              Text(this.currentTalkLine)
-                .fontSize(12)
-                .fontColor('#243244')
-                .lineHeight(18)
-                .textAlign(TextAlign.Start)
-            }
-            .width('50%')
-            .padding({ left: 12, right: 12, top: 10, bottom: 10 })
-            .backgroundColor('#FFF8E8')
-            .borderRadius(18)
-            .opacity(this.talkBubbleOpacity)
-            .scale({ x: this.talkBubbleScale, y: this.talkBubbleScale })
-            .shadow({
-              radius: 18,
-              color: 'rgba(0,0,0,0.12)',
-              offsetX: 0,
-              offsetY: 8
-            })
-            .position({ x: '8%', y: '18%' })
-          }
-
-          Column({ space: 8 }) {
-            Text(stage.badgeText)
-              .fontSize(12)
-              .fontColor(stage.accentColor)
-              .fontWeight(FontWeight.Medium)
-
-            Text(stage.skinName)
-              .fontSize(15)
-              .fontColor('#FFFFFF')
-              .fontWeight(FontWeight.Bold)
-          }
-          .padding({ left: 14, right: 14, top: 10, bottom: 10 })
-          .backgroundColor('rgba(10,14,22,0.34)')
-          .borderRadius(18)
-          .position({ x: '33%', y: '82%' })
-        }
-      }
-      .width('90%')
-      .height(340)
-      .clip(true)
-      .backgroundColor('rgba(255,255,255,0.08)')
       .border({
         width: 1,
-        color: 'rgba(255,255,255,0.10)'
+        color: `${this.accentColor}22`
       })
-      .borderRadius(32)
+      .borderRadius(24)
+
+      Stack({ alignContent: Alignment.Center }) {
+        Column()
+          .width('90%')
+          .height(360)
+          .borderRadius(32)
+          .linearGradient({
+            angle: 180,
+            colors: [
+              [stage.glowColor, 0],
+              [`${this.accentColor}12`, 0.55],
+              ['rgba(255,255,255,0.05)', 1]
+            ]
+          })
+
+        Canvas(this.canvasRenderingContext)
+          .width(300)
+          .height(300)
+          .scale({ x: this.petScale, y: this.petScale })
+          .position({ x: '50%', y: '50%' })
+          .translate({ x: -150, y: -118 })
+          .onClick(() => {
+            void this.pickTalkLine();
+          })
+          .onReady(() => {
+            this.canvasRenderingContext.imageSmoothingEnabled = true;
+            this.canvasRenderingContext.imageSmoothingQuality = 'medium';
+            this.currentLoadedAnimation = '';
+            void this.loadAnimation();
+          })
+
+        if (this.talkBubbleVisible && this.currentTalkLine !== '') {
+          Column() {
+            Text(this.currentTalkLine)
+              .fontSize(13)
+              .fontColor('#243244')
+              .lineHeight(19)
+              .textAlign(TextAlign.Start)
+          }
+          .width(188)
+          .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+          .backgroundColor('#FFF8E8')
+          .borderRadius(18)
+          .opacity(this.talkBubbleOpacity)
+          .scale({ x: this.talkBubbleScale, y: this.talkBubbleScale })
+          .shadow({
+            radius: 18,
+            color: 'rgba(0,0,0,0.12)',
+            offsetX: 0,
+            offsetY: 8
+          })
+          .position({ x: '8%', y: '18%' })
+        }
+
+        Column({ space: 8 }) {
+          Text(stage.badgeText)
+            .fontSize(12)
+            .fontColor(this.accentColor)
+            .fontWeight(FontWeight.Medium)
+
+          Text(stage.skinName)
+            .fontSize(15)
+            .fontColor('#FFFFFF')
+            .fontWeight(FontWeight.Bold)
+        }
+        .padding({ left: 14, right: 14, top: 10, bottom: 10 })
+        .backgroundColor('rgba(10,14,22,0.34)')
+        .borderRadius(18)
+        .position({ x: '50%', y: '82%' })
+        .translate({ x: -55, y: 0 })
+      }
+      .width('100%')
+      .height(360)
 
       Column({ space: 12 }) {
         Row() {
@@ -632,9 +666,9 @@ export struct CompanionComponent {
               Row({ space: 8 }) {
                 Text(`奖励 +${task.reward}`)
                   .fontSize(11)
-                  .fontColor('#FFD878')
+                  .fontColor(this.accentColor)
                   .padding({ left: 10, right: 10, top: 4, bottom: 4 })
-                  .backgroundColor('rgba(255,216,120,0.12)')
+                  .backgroundColor(`${this.accentColor}20`)
                   .borderRadius(12)
 
                 Text(this.getTaskProgressText(task))
@@ -653,9 +687,11 @@ export struct CompanionComponent {
               .backgroundColor(this.getTaskButtonBackground(task))
               .borderRadius(14)
               .onClick(() => {
-                if (this.canClaimTask(task)) {
+                if (this.shouldDirectClaimDailyLogin(task)) {
                   this.onClaimTaskReward(task.id);
-                } else {
+                } else if (this.canClaimTask(task)) {
+                  this.onClaimTaskReward(task.id);
+                } else if (this.shouldNavigateTask(task)) {
                   this.onGoToTask(task.id);
                 }
               })
@@ -669,17 +705,22 @@ export struct CompanionComponent {
       .width('90%')
       .padding({ left: 16, right: 16, top: 16, bottom: 16 })
       .backgroundColor('rgba(255,255,255,0.08)')
+      .border({
+        width: 1,
+        color: `${this.accentColor}18`
+      })
       .borderRadius(24)
 
       Row({ space: 12 }) {
-        this.buildStatCard('连续天数', `${this.continuousDays} 天`, stage.accentColor)
-        this.buildStatCard('累计番茄', `${this.totalTomatoCount} 个`, stage.accentColor)
-        this.buildStatCard('今日完成', `${this.todayTomatoCount} 个`, stage.accentColor)
+        this.buildStatCard('连续天数', `${this.continuousDays} 天`, this.accentColor)
+        this.buildStatCard('累计番茄', `${this.totalTomatoCount} 个`, this.accentColor)
+        this.buildStatCard('今日完成', `${this.todayTomatoCount} 个`, this.accentColor)
       }
       .width('90%')
 
       Column({ space: 12 }) {
         this.buildInfoCard('当前皮肤', stage.skinName, '#FFFFFF')
+        this.buildInfoCard('猫咪提醒', stage.hint, 'rgba(255,255,255,0.84)')
       }
       .width('90%')
       .margin({ bottom: 28 })
@@ -704,7 +745,7 @@ export struct CompanionComponent {
 
         Text(`已解锁 ${this.unlockedStageTitle}`)
           .fontSize(15)
-          .fontColor(stage.accentColor)
+          .fontColor(this.accentColor)
 
         Text(this.unlockedStageReward)
           .fontSize(14)
@@ -719,13 +760,17 @@ export struct CompanionComponent {
           .backgroundColor('rgba(255,255,255,0.08)')
           .borderRadius(14)
 
+        Text(stage.unlockText)
+          .fontSize(12)
+          .fontColor('rgba(255,255,255,0.64)')
+
         Button('我知道啦')
           .fontSize(15)
           .fontWeight(FontWeight.Bold)
           .fontColor('#1A2432')
           .height(42)
           .padding({ left: 24, right: 24 })
-          .backgroundColor('#FFD878')
+          .backgroundColor(this.accentColor)
           .borderRadius(21)
           .onClick(() => {
             this.onDismissLevelUp();
@@ -736,7 +781,7 @@ export struct CompanionComponent {
       .backgroundColor('rgba(18,24,34,0.96)')
       .border({
         width: 1,
-        color: stage.accentColor
+        color: this.accentColor
       })
       .borderRadius(28)
       .alignItems(HorizontalAlign.Center)

@@ -160,6 +160,20 @@ struct StudyRoom {
     return this.scenes[this.currentSceneIndex];
   }
 
+  getCurrentSceneAccent(): string {
+    return this.getCurrentScene().accentColor;
+  }
+
+  getCurrentSceneAccentSolid(): string {
+    if (this.currentSceneIndex === 0) {
+      return '#6FB784';
+    }
+    if (this.currentSceneIndex === 1) {
+      return '#60BFD9';
+    }
+    return '#8E98E8';
+  }
+
   getSceneBackground(): Resource {
     switch (this.getCurrentScene().imageName) {
       case 'forest2.jpg':
@@ -363,6 +377,19 @@ struct StudyRoom {
     const nextTasks: CompanionDailyTask[] = [];
     this.companionDailyTasks.forEach((task: CompanionDailyTask) => {
       if (task.id === taskId) {
+        if (task.id === 'daily_login' && task.progress <= 0 && task.claimedCount <= 0) {
+          claimedAffinity = task.reward;
+          nextTasks.push({
+            id: task.id,
+            title: task.title,
+            description: task.description,
+            reward: task.reward,
+            progress: 1,
+            target: task.target,
+            claimedCount: 1
+          });
+          return;
+        }
         const claimableCount = Math.floor(task.progress / task.target) - task.claimedCount;
         if (claimableCount > 0) {
           claimedAffinity = task.reward * claimableCount;
@@ -621,16 +648,16 @@ struct StudyRoom {
     this.savedAccount = '8209230113';
     this.savedPassword = '123456';
     this.profile = {
-      nickname: '晚晨',
+      nickname: '卿晨',
       account: this.savedAccount,
       signature: '用番茄钟把每天的学习沉淀下来。',
       targetTomatoes: 6
     };
 
-    this.tomatoCount = 4;
-    this.completedFocusSessions = 4;
-    this.totalFocusSeconds = 95 * 60;
-    this.totalTomatoCount = 52;
+    this.tomatoCount = 3;
+    this.completedFocusSessions = 3;
+    this.totalFocusSeconds = 88 * 60;
+    this.totalTomatoCount = 51;
     this.continuousDays = 12;
     this.lastActiveDate = todayKey;
     this.showCompletedTodos = true;
@@ -642,14 +669,14 @@ struct StudyRoom {
         completed: false,
         pinned: true,
         estimatedTomatoes: 4,
-        doneTomatoes: 2
+        doneTomatoes: 3
       },
       {
         id: 1002,
         text: '整理 StudyRoom 演示截图',
         completed: false,
         pinned: false,
-        estimatedTomatoes: 3,
+        estimatedTomatoes: 2,
         doneTomatoes: 1
       },
       {
@@ -685,7 +712,7 @@ struct StudyRoom {
         title: '每日来打卡',
         description: '主人今天来啦，猫猫先蹭蹭你一下喵。',
         reward: 8,
-        progress: 1,
+        progress: 0,
         target: 1,
         claimedCount: 0
       },
@@ -694,7 +721,7 @@ struct StudyRoom {
         title: '完成一轮专注',
         description: '陪我安静学一小轮吧，猫猫会乖乖守着你喵。',
         reward: 12,
-        progress: 4,
+        progress: 3,
         target: 1,
         claimedCount: 3
       },
@@ -703,21 +730,21 @@ struct StudyRoom {
         title: '完成一个学习任务',
         description: '把一项任务做完给我看，好想夸夸认真主人喵。',
         reward: 25,
-        progress: 1,
+        progress: 2,
         target: 1,
-        claimedCount: 0
+        claimedCount: 2
       },
       {
         id: 'immersion_twenty',
         title: '沉浸视频学习 20 分钟',
         description: '陪我看着你沉浸学 20 分钟，猫猫就更安心啦喵。',
         reward: 20,
-        progress: 1,
+        progress: 0,
         target: 1,
         claimedCount: 0
       }
     ];
-    this.immersionTaskMinutes = 22;
+    this.immersionTaskMinutes = 19;
     this.latestClaimSummary = '';
     this.refreshStatsView();
   }
@@ -1513,7 +1540,7 @@ struct StudyRoom {
           angle: 135,
           colors: [
             ['rgba(11,14,20,0.08)', 0],
-            [this.getCurrentScene().bgColor, 0.55],
+            [this.getCurrentScene().bgColor, 0.52],
             ['#161A24', 1]
           ]
         })
@@ -1635,6 +1662,7 @@ struct StudyRoom {
                     totalFocusSeconds: this.totalFocusSeconds,
                     totalSeconds: this.totalSeconds,
                     totalDuration: this.currentSessionTotalSeconds,
+                    accentColor: this.getCurrentSceneAccentSolid(),
                     onStart: () => {
                       this.startTimer();
                     },
@@ -1686,6 +1714,7 @@ struct StudyRoom {
                   showCompleted: this.showCompletedTodos,
                   activeTodoId: this.activeTodoId,
                   isFocusRunning: this.isRunning,
+                  accentColor: this.getCurrentSceneAccentSolid(),
                   onToggle: (index: number) => {
                     this.toggleTodo(index);
                   },
@@ -1732,6 +1761,7 @@ struct StudyRoom {
                 unlockedStageTitle: this.unlockedStageTitle,
                 unlockedStageReward: this.unlockedStageReward,
                 latestClaimSummary: this.latestClaimSummary,
+                accentColor: this.getCurrentSceneAccentSolid(),
                 onClaimTaskReward: (taskId: string) => {
                   this.claimTaskReward(taskId);
                 },
@@ -1756,6 +1786,7 @@ struct StudyRoom {
                 currentVideoName: this.getCurrentVideoName(),
                 currentVideoIndex: this.currentVideoIndex,
                 videoList: this.immersionVideoList,
+                accentColor: this.getCurrentSceneAccentSolid(),
                 onVideoChange: (index: number) => {
                   this.switchImmersionVideo(index);
                 }
@@ -1771,6 +1802,9 @@ struct StudyRoom {
                 todayTomatoCount: this.tomatoCount,
                 totalFocusMinutes: this.getTotalFocusMinutes(),
                 statsVersion: this.statsVersion,
+                accentColor: this.getCurrentSceneAccentSolid(),
+                contributionDays: this.getRecentTomatoRecords(),
+                companionProgress: this.companionProgress,
                 onNicknameChange: (value: string) => {
                   this.profile = {
                     nickname: value,
@@ -1801,6 +1835,9 @@ struct StudyRoom {
                 },
                 onLogout: () => {
                   this.logout();
+                },
+                onGoCompanion: () => {
+                  this.currentTabIndex = 2;
                 }
               })
             }

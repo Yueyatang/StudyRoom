@@ -8,6 +8,7 @@ export struct TodoComponent {
   @Prop showCompleted: boolean = false;
   @Prop activeTodoId: number = -1;
   @Prop isFocusRunning: boolean = false;
+  @Prop accentColor: string = '#FFD878';
   onToggle: (index: number) => void = () => {};
   onDelete: (index: number) => void = () => {};
   onTextChange: (value: string) => void = () => {};
@@ -17,7 +18,7 @@ export struct TodoComponent {
   onSelectActive: (index: number) => void = () => {};
   onAdjustEstimate: (index: number, delta: number) => void = () => {};
 
-  getCompletedCount(): number {
+  private getCompletedCount(): number {
     let count = 0;
     this.todoList.forEach((item: TodoItem) => {
       if (item.completed) {
@@ -27,38 +28,41 @@ export struct TodoComponent {
     return count;
   }
 
-  getProgress(): number {
+  private getProgress(): number {
     if (this.todoList.length === 0) {
       return 0;
     }
     return this.getCompletedCount() / this.todoList.length;
   }
 
-  getEncouragement(): string {
+  private getEncouragement(): string {
     const rate = this.getProgress();
     if (rate === 0) {
-      return '今天也要加油哦！';
-    } else if (rate < 0.3) {
-      return '好的开始是成功的一半！';
-    } else if (rate < 0.6) {
-      return '继续保持，你正在进步！';
-    } else if (rate < 0.9) {
-      return '太棒了，即将完成！';
-    } else if (rate < 1) {
-      return '就差最后一步了！';
-    } else {
-      return '完美！你已超越自己！';
+      return '今天也要稳稳开始。';
     }
+    if (rate < 0.3) {
+      return '好的开头，就是高效的一半。';
+    }
+    if (rate < 0.6) {
+      return '节奏很不错，继续推进。';
+    }
+    if (rate < 0.9) {
+      return '已经完成大半，快要收尾了。';
+    }
+    if (rate < 1) {
+      return '就差最后几步了。';
+    }
+    return '清单完成得很漂亮。';
   }
 
-  getTomatoProgress(item: TodoItem): number {
+  private getTomatoProgress(item: TodoItem): number {
     if (item.estimatedTomatoes <= 0) {
       return 0;
     }
     return Math.min(1, item.doneTomatoes / item.estimatedTomatoes);
   }
 
-  getPendingIndexes(): number[] {
+  private getPendingIndexes(): number[] {
     const indexes: number[] = [];
     this.todoList.forEach((item: TodoItem, index: number) => {
       if (!item.completed) {
@@ -76,7 +80,7 @@ export struct TodoComponent {
     return indexes;
   }
 
-  getCompletedIndexes(): number[] {
+  private getCompletedIndexes(): number[] {
     const indexes: number[] = [];
     this.todoList.forEach((item: TodoItem, index: number) => {
       if (item.completed) {
@@ -86,23 +90,20 @@ export struct TodoComponent {
     return indexes;
   }
 
-  // 删除确认弹窗
-  private showDeleteConfirm(index: number) {
+  private isActiveTodo(item: TodoItem): boolean {
+    return item.id === this.activeTodoId && !item.completed;
+  }
+
+  private showDeleteConfirm(index: number): void {
     promptAction.showDialog({
       title: '确认删除',
-      message: '确定要删除该任务吗？',
+      message: '确定要删除这项学习任务吗？',
       buttons: [
-        {
-          text: '取消',
-          color: '#999999'
-        },
-        {
-          text: '删除',
-          color: '#FF6B6B'
-        }
+        { text: '取消', color: '#999999' },
+        { text: '删除', color: '#FF6B6B' }
       ]
     }).then((result) => {
-      if (result.index === 1) { // 点击“删除”按钮（索引为1）
+      if (result.index === 1) {
         this.onDelete(index);
       }
     }).catch((err: Error) => {
@@ -111,16 +112,16 @@ export struct TodoComponent {
   }
 
   @Builder
-  taskRow(item: TodoItem, index: number) {
+  private taskRow(item: TodoItem, index: number): void {
     Column({ space: 12 }) {
       Row() {
         Stack({ alignContent: Alignment.Center }) {
           Circle()
             .width(26)
             .height(26)
-            .stroke(item.completed ? '#FFD878' : 'rgba(255,255,255,0.3)')
+            .stroke(item.completed ? this.accentColor : 'rgba(255,255,255,0.3)')
             .strokeWidth(2.5)
-            .fill(item.completed ? '#FFD878' : 'transparent')
+            .fill(item.completed ? this.accentColor : 'transparent')
 
           if (item.completed) {
             Text('✓')
@@ -149,21 +150,21 @@ export struct TodoComponent {
         if (item.pinned && !item.completed) {
           Text('置顶')
             .fontSize(10)
-            .fontColor('#FFD878')
+            .fontColor(this.accentColor)
             .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-            .backgroundColor('rgba(255,216,120,0.15)')
+            .backgroundColor(`${this.accentColor}26`)
             .borderRadius(10)
         }
 
-          if (item.id === this.activeTodoId && !item.completed) {
-            Text(this.isFocusRunning ? '专注中' : '已选择')
-              .fontSize(10)
-              .fontColor(this.isFocusRunning ? '#9EE2FF' : '#FFD878')
-              .padding({ left: 8, right: 8, top: 3, bottom: 3 })
-              .backgroundColor(this.isFocusRunning ? 'rgba(158,226,255,0.14)' : 'rgba(255,216,120,0.14)')
-              .borderRadius(10)
-              .margin({ left: 6 })
-          }
+        if (this.isActiveTodo(item)) {
+          Text(this.isFocusRunning ? '专注中' : '已选择')
+            .fontSize(10)
+            .fontColor('#FFFFFF')
+            .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+            .backgroundColor(this.isFocusRunning ? `${this.accentColor}CC` : `${this.accentColor}88`)
+            .borderRadius(10)
+            .margin({ left: 6 })
+        }
       }
       .width('100%')
 
@@ -171,7 +172,7 @@ export struct TodoComponent {
         Text(item.completed ? `已完成 ${item.doneTomatoes}/${item.estimatedTomatoes}` : `${item.doneTomatoes}/${item.estimatedTomatoes} 番茄`)
           .fontSize(11)
           .fontColor(item.completed ? 'rgba(196,202,208,0.42)' : 'rgba(255,255,255,0.56)')
-          .width(64)
+          .width(80)
 
         Stack({ alignContent: Alignment.Start }) {
           Row()
@@ -183,7 +184,7 @@ export struct TodoComponent {
           Row()
             .width(`${this.getTomatoProgress(item) * 100}%`)
             .height(5)
-            .backgroundColor(item.completed ? 'rgba(255,216,120,0.45)' : '#FFD878')
+            .backgroundColor(item.completed ? `${this.accentColor}99` : this.accentColor)
             .borderRadius(3)
         }
         .layoutWeight(1)
@@ -218,12 +219,12 @@ export struct TodoComponent {
 
       Row({ space: 8 }) {
         if (!item.completed) {
-          Button(item.id === this.activeTodoId ? (this.isFocusRunning ? '专注中' : '已选择') : '设为专注')
+          Button(this.isActiveTodo(item) ? (this.isFocusRunning ? '专注中' : '已选择') : '设为专注')
             .fontSize(12)
-            .fontColor(item.id === this.activeTodoId ? (this.isFocusRunning ? '#9EE2FF' : '#FFD878') : '#EAF2F8')
+            .fontColor(this.isActiveTodo(item) ? '#102131' : '#EAF2F8')
             .height(32)
             .layoutWeight(1)
-            .backgroundColor(item.id === this.activeTodoId ? (this.isFocusRunning ? 'rgba(158,226,255,0.16)' : 'rgba(255,216,120,0.14)') : 'rgba(255,255,255,0.08)')
+            .backgroundColor(this.isActiveTodo(item) ? `${this.accentColor}CC` : 'rgba(255,255,255,0.08)')
             .borderRadius(16)
             .onClick(() => {
               this.onSelectActive(index);
@@ -231,10 +232,10 @@ export struct TodoComponent {
 
           Button(item.pinned ? '取消置顶' : '置顶')
             .fontSize(12)
-            .fontColor(item.pinned ? '#FFD878' : 'rgba(255,255,255,0.72)')
+            .fontColor(item.pinned ? this.accentColor : 'rgba(255,255,255,0.72)')
             .height(32)
             .layoutWeight(1)
-            .backgroundColor(item.pinned ? 'rgba(255,216,120,0.16)' : 'rgba(255,255,255,0.08)')
+            .backgroundColor(item.pinned ? `${this.accentColor}24` : 'rgba(255,255,255,0.08)')
             .borderRadius(16)
             .onClick(() => {
               this.onPin(index);
@@ -259,23 +260,24 @@ export struct TodoComponent {
     .backgroundColor(
       item.completed
         ? 'rgba(255,255,255,0.03)'
+        : this.isActiveTodo(item)
+        ? `${this.accentColor}20`
         : item.pinned
-        ? 'rgba(255,216,120,0.08)'
+        ? `${this.accentColor}14`
         : 'rgba(255,255,255,0.05)'
     )
     .borderRadius(16)
     .border({
-      width: item.pinned && !item.completed ? 1 : 0,
-      color: 'rgba(255,216,120,0.15)'
+      width: this.isActiveTodo(item) || (item.pinned && !item.completed) ? 1 : 0,
+      color: `${this.accentColor}44`
     })
     .margin({ bottom: 8 })
   }
 
-  build() {
+  build(): void {
     Column() {
-      // 头部
       Row() {
-        Column() {
+        Column({ space: 4 }) {
           Text('学习清单')
             .fontSize(20)
             .fontWeight(FontWeight.Bold)
@@ -283,28 +285,27 @@ export struct TodoComponent {
 
           Text(this.getEncouragement())
             .fontSize(13)
-            .fontColor('rgba(255,216,120,0.8)')
-            .margin({ top: 4 })
+            .fontColor(this.accentColor)
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
 
         Stack({ alignContent: Alignment.Center }) {
           Circle()
-            .width(52)
-            .height(52)
+            .width(56)
+            .height(56)
             .stroke('rgba(255,255,255,0.08)')
             .strokeWidth(4)
             .fill('transparent')
 
           Circle()
-            .width(52)
-            .height(52)
-            .stroke('#FFD878')
+            .width(56)
+            .height(56)
+            .stroke(this.accentColor)
             .strokeWidth(4)
             .fill('transparent')
-            .strokeDashArray([Math.PI * 52, Math.PI * 52])
-            .strokeDashOffset((1 - this.getProgress()) * Math.PI * 52)
+            .strokeDashArray([Math.PI * 56, Math.PI * 56])
+            .strokeDashOffset((1 - this.getProgress()) * Math.PI * 56)
             .rotate({ angle: -90 })
 
           Text(`${Math.round(this.getProgress() * 100)}%`)
@@ -316,7 +317,6 @@ export struct TodoComponent {
       .width('100%')
       .margin({ bottom: 14 })
 
-      // 进度条
       Column() {
         Row() {
           Text(`已完成 ${this.getCompletedCount()} 项`)
@@ -332,22 +332,18 @@ export struct TodoComponent {
         .width('100%')
         .margin({ bottom: 6 })
 
-        Row() {
-          Row()
-            .width(`${this.getProgress() * 100}%`)
-            .height(4)
-            .backgroundColor('#FFD878')
-            .borderRadius(2)
-        }
-        .width('100%')
-        .height(4)
-        .backgroundColor('rgba(255,255,255,0.08)')
-        .borderRadius(2)
+        Row()
+          .width(`${this.getProgress() * 100}%`)
+          .height(4)
+          .backgroundColor(this.accentColor)
+          .borderRadius(2)
       }
       .width('100%')
+      .height(10)
+      .backgroundColor('rgba(255,255,255,0.08)')
+      .borderRadius(5)
       .margin({ bottom: 16 })
 
-      // 添加输入框
       Row() {
         TextInput({ placeholder: '添加新的学习目标...', text: this.newTodoText })
           .placeholderColor('rgba(255,255,255,0.3)')
@@ -371,7 +367,7 @@ export struct TodoComponent {
           .fontColor('#1B2431')
           .height(46)
           .padding({ left: 20, right: 20 })
-          .backgroundColor('#FFD878')
+          .backgroundColor(this.accentColor)
           .borderRadius(23)
           .margin({ left: 10 })
           .onClick(() => {
@@ -381,17 +377,14 @@ export struct TodoComponent {
       .width('100%')
       .margin({ bottom: 16 })
 
-      // 未完成任务
       if (this.getPendingIndexes().length > 0) {
         Column() {
-          Row() {
-            Text(`进行中 (${this.getPendingIndexes().length})`)
-              .fontSize(13)
-              .fontWeight(FontWeight.Medium)
-              .fontColor('rgba(255,255,255,0.7)')
-          }
-          .width('100%')
-          .margin({ bottom: 10 })
+          Text(`进行中 (${this.getPendingIndexes().length})`)
+            .fontSize(13)
+            .fontWeight(FontWeight.Medium)
+            .fontColor('rgba(255,255,255,0.7)')
+            .width('100%')
+            .margin({ bottom: 10 })
 
           ForEach(this.getPendingIndexes(), (index: number) => {
             this.taskRow(this.todoList[index], index)
@@ -400,22 +393,16 @@ export struct TodoComponent {
         .width('100%')
       }
 
-      // 全部完成状态
       if (this.getPendingIndexes().length === 0 && this.todoList.length > 0) {
-        Column() {
-          Text('🎉')
-            .fontSize(48)
-            .margin({ bottom: 8 })
-
-          Text('所有任务都完成了！')
+        Column({ space: 8 }) {
+          Text('任务都完成了')
             .fontSize(16)
             .fontWeight(FontWeight.Medium)
             .fontColor('#FFFFFF')
 
-          Text('你太棒了，休息一下吧')
+          Text('可以休息一下，或者继续开启新的目标。')
             .fontSize(13)
             .fontColor('rgba(255,255,255,0.4)')
-            .margin({ top: 4 })
         }
         .width('100%')
         .padding({ top: 24, bottom: 24 })
@@ -425,29 +412,22 @@ export struct TodoComponent {
         .margin({ bottom: 10 })
       }
 
-      // 空状态
       if (this.todoList.length === 0) {
-        Column() {
-          Text('📋')
-            .fontSize(48)
-            .margin({ bottom: 8 })
-
+        Column({ space: 8 }) {
           Text('还没有学习目标')
             .fontSize(16)
             .fontWeight(FontWeight.Medium)
             .fontColor('rgba(255,255,255,0.5)')
 
-          Text('在上方添加你的第一个目标吧')
+          Text('在上方添加你的第一个目标吧。')
             .fontSize(13)
             .fontColor('rgba(255,255,255,0.3)')
-            .margin({ top: 4 })
         }
         .width('100%')
         .padding({ top: 32, bottom: 32 })
         .alignItems(HorizontalAlign.Center)
       }
 
-      // 已完成（折叠）
       if (this.getCompletedIndexes().length > 0) {
         Column() {
           Row() {
@@ -495,7 +475,7 @@ export struct TodoComponent {
     .padding({ left: 20, right: 20, top: 20, bottom: 20 })
     .border({
       width: 1,
-      color: 'rgba(255,255,255,0.06)'
+      color: `${this.accentColor}22`
     })
     .backdropBlur(10)
     .margin({ bottom: 40 })

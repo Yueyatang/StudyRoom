@@ -7,9 +7,9 @@ export struct TimerComponent {
   @Prop isRunning: boolean = false;
   @Prop completedFocusSessions: number = 0;
   @Prop totalFocusSeconds: number = 0;
-  // 新增：用于绘制进度条
   @Prop totalSeconds: number = 0;
-  @Prop totalDuration: number = 1; // 避免除零
+  @Prop totalDuration: number = 1;
+  @Prop accentColor: string = '#FFD878';
 
   onStart: () => void = () => {};
   onPause: () => void = () => {};
@@ -19,7 +19,7 @@ export struct TimerComponent {
 
   private readonly modes: TimerMode[] = ['focus', 'shortBreak', 'longBreak'];
 
-  getModeLabel(mode: TimerMode): string {
+  private getModeLabel(mode: TimerMode): string {
     if (mode === 'focus') {
       return '专注';
     }
@@ -29,21 +29,20 @@ export struct TimerComponent {
     return '长休息';
   }
 
-  getModeHint(): string {
+  private getModeHint(): string {
     if (this.currentMode === 'focus') {
-      return this.isRunning ? '保持节奏，先专注这一轮。' : '整理思绪，准备进入专注状态。';
+      return this.isRunning ? '保持节奏，先把这一轮安静完成。' : '整理思绪，准备进入专注状态。';
     }
     if (this.currentMode === 'shortBreak') {
-      return this.isRunning ? '短暂放松一下，给大脑留出缓冲。' : '短休息即将开始，记得活动肩颈。';
+      return this.isRunning ? '小憩片刻，让大脑缓一缓。' : '短休息即将开始，记得活动一下肩颈。';
     }
-    return this.isRunning ? '长休息进行中，慢慢恢复能量。' : '完成阶段冲刺后，给自己一次完整休息。';
+    return this.isRunning ? '长休息进行中，慢慢恢复能量。' : '完成一段冲刺后，给自己一次完整休息。';
   }
 
-  getFocusDurationLabel(): string {
+  private getFocusDurationLabel(): string {
     return `${Math.floor(this.totalFocusSeconds / 60)} 分钟`;
   }
 
-  // 计算进度 (0 ~ 1)
   private getProgress(): number {
     const duration = this.totalDuration > 0 ? this.totalDuration : 1;
     const remain = Math.max(0, Math.min(this.totalSeconds, duration));
@@ -52,18 +51,16 @@ export struct TimerComponent {
 
   build() {
     Column() {
-      // 标题 & 当前模式标签
       Row() {
-        Column() {
+        Column({ space: 6 }) {
           Text('番茄钟')
-            .fontSize(18)
+            .fontSize(20)
             .fontWeight(FontWeight.Bold)
             .fontColor('#FFFFFF')
 
           Text(this.getModeHint())
             .fontSize(12)
             .fontColor('rgba(234,239,244,0.76)')
-            .margin({ top: 6 })
         }
         .layoutWeight(1)
         .alignItems(HorizontalAlign.Start)
@@ -71,24 +68,24 @@ export struct TimerComponent {
         Text(this.getModeLabel(this.currentMode))
           .fontSize(12)
           .fontWeight(FontWeight.Medium)
-          .fontColor('#FFE2A8')
+          .fontColor('#FFFFFF')
           .padding({ left: 12, right: 12, top: 6, bottom: 6 })
-          .backgroundColor('rgba(255,216,120,0.16)')
+          .backgroundColor(this.accentColor)
+          .opacity(0.9)
           .borderRadius(16)
       }
       .width('100%')
       .margin({ bottom: 14 })
 
-      // 模式切换按钮
-      Row() {
+      Row({ space: 10 }) {
         ForEach(this.modes, (mode: TimerMode) => {
           Button(this.getModeLabel(mode))
             .fontSize(12)
-            .fontWeight(this.currentMode === mode ? FontWeight.Medium : FontWeight.Regular)
-            .fontColor(this.currentMode === mode ? '#1D2430' : '#F4F7FA')
+            .fontWeight(this.currentMode === mode ? FontWeight.Bold : FontWeight.Regular)
+            .fontColor(this.currentMode === mode ? '#142031' : '#F4F7FA')
             .height(38)
             .layoutWeight(1)
-            .backgroundColor(this.currentMode === mode ? '#FFD878' : 'rgba(255,255,255,0.10)')
+            .backgroundColor(this.currentMode === mode ? this.accentColor : 'rgba(255,255,255,0.10)')
             .borderRadius(20)
             .onClick(() => {
               this.onSelectMode(mode);
@@ -96,35 +93,41 @@ export struct TimerComponent {
         })
       }
       .width('100%')
-      .margin({ bottom: 16 })
+      .margin({ bottom: 18 })
 
-      // ----- 计时器圆环 + 数字（核心） -----
       Stack({ alignContent: Alignment.Center }) {
-        // 背景圆环
         Circle()
-          .width(200)
-          .height(200)
-          .stroke('rgba(255,255,255,0.12)')
-          .strokeWidth(6)
+          .width(214)
+          .height(214)
+          .fill('rgba(255,255,255,0.03)')
+          .shadow({
+            radius: 32,
+            color: `${this.accentColor}33`,
+            offsetX: 0,
+            offsetY: 6
+          })
+
+        Circle()
+          .width(214)
+          .height(214)
+          .stroke('rgba(255,255,255,0.10)')
+          .strokeWidth(8)
           .fill('transparent')
 
-        // 进度圆环（金色，从顶部开始旋转）
         Circle()
-          .width(200)
-          .height(200)
-          .stroke('#FFD878')
-          .strokeWidth(6)
+          .width(214)
+          .height(214)
+          .stroke(this.accentColor)
+          .strokeWidth(8)
           .fill('transparent')
-          .strokeDashArray([Math.PI * 200, Math.PI * 200]) // 周长 ≈ 565.48
-          .strokeDashOffset((1 - this.getProgress()) * Math.PI * 200)
-          .rotate({ angle: -90 }) // 起点在12点钟方向
+          .strokeDashArray([Math.PI * 214, Math.PI * 214])
+          .strokeDashOffset((1 - this.getProgress()) * Math.PI * 214)
+          .rotate({ angle: -90 })
 
-        // 计时数字
-        Column() {
-          Text('当前计时')
+        Column({ space: 10 }) {
+          Text(this.currentMode === 'focus' ? '当前专注' : this.getModeLabel(this.currentMode))
             .fontSize(12)
             .fontColor('rgba(237,242,248,0.72)')
-            .margin({ bottom: 10 })
 
           Text(this.timerDisplay)
             .fontSize(54)
@@ -133,22 +136,19 @@ export struct TimerComponent {
             .fontFamily('monospace')
             .letterSpacing(4)
         }
-        .width('100%')
-        .padding({ top: 28, bottom: 28 })
       }
       .width('100%')
-      .margin({ bottom: 16 })
+      .margin({ bottom: 18 })
 
-      // 控制按钮
-      Row() {
-        Button(this.isRunning ? '进行中' : '开始专注')
+      Row({ space: 10 }) {
+        Button(this.isRunning ? '继续进行' : '开始专注')
           .fontSize(14)
-          .fontWeight(FontWeight.Medium)
+          .fontWeight(FontWeight.Bold)
           .fontColor('#162030')
-          .height(42)
+          .height(44)
           .layoutWeight(1.3)
-          .backgroundColor('#F6D08C')
-          .borderRadius(21)
+          .backgroundColor(this.accentColor)
+          .borderRadius(22)
           .onClick(() => {
             this.onStart();
           })
@@ -156,11 +156,10 @@ export struct TimerComponent {
         Button('暂停')
           .fontSize(14)
           .fontColor('#F3F6FA')
-          .height(42)
+          .height(44)
           .layoutWeight(1)
-          .backgroundColor('rgba(255,255,255,0.12)')
-          .borderRadius(21)
-          .margin({ left: 10 })
+          .backgroundColor('rgba(255,255,255,0.10)')
+          .borderRadius(22)
           .onClick(() => {
             this.onPause();
           })
@@ -168,18 +167,16 @@ export struct TimerComponent {
         Button('重置')
           .fontSize(14)
           .fontColor('#F3F6FA')
-          .height(42)
+          .height(44)
           .layoutWeight(1)
-          .backgroundColor('rgba(255,255,255,0.12)')
-          .borderRadius(21)
-          .margin({ left: 10 })
+          .backgroundColor('rgba(255,255,255,0.10)')
+          .borderRadius(22)
           .onClick(() => {
             this.onReset();
           })
       }
       .width('100%')
 
-      // 时长微调
       Row() {
         Text('时长微调')
           .fontSize(12)
@@ -192,7 +189,7 @@ export struct TimerComponent {
           .fontColor('#EAF0F6')
           .height(34)
           .padding({ left: 14, right: 14 })
-          .backgroundColor('rgba(255,255,255,0.10)')
+          .backgroundColor('rgba(255,255,255,0.08)')
           .borderRadius(17)
           .onClick(() => {
             this.onAdjustMinutes(-5);
@@ -203,7 +200,7 @@ export struct TimerComponent {
           .fontColor('#EAF0F6')
           .height(34)
           .padding({ left: 14, right: 14 })
-          .backgroundColor('rgba(255,255,255,0.10)')
+          .backgroundColor('rgba(255,255,255,0.08)')
           .borderRadius(17)
           .margin({ left: 8 })
           .onClick(() => {
@@ -211,54 +208,51 @@ export struct TimerComponent {
           })
       }
       .width('100%')
-      .margin({ top: 14, bottom: 14 })
+      .margin({ top: 14, bottom: 16 })
 
-      // 统计卡片
-      Row() {
-        Column() {
-          Text('完成轮次')
-            .fontSize(11)
-            .fontColor('rgba(225,231,237,0.68)')
-          Text(`${this.completedFocusSessions}`)
-            .fontSize(24)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#FFFFFF')
-            .margin({ top: 6 })
-        }
-        .layoutWeight(1.1)
-        .alignItems(HorizontalAlign.Start)
-        .padding(14)
-        .backgroundColor('rgba(255,255,255,0.08)')
-        .borderRadius(20)
-
-        Column() {
-          Text('累计专注')
-            .fontSize(11)
-            .fontColor('rgba(225,231,237,0.68)')
-          Text(this.getFocusDurationLabel())
-            .fontSize(20)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#FFFFFF')
-            .margin({ top: 6 })
-        }
-        .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-        .padding(14)
-        .backgroundColor('rgba(255,255,255,0.08)')
-        .borderRadius(20)
-        .margin({ left: 10 })
+      Row({ space: 10 }) {
+        this.buildStatCard('完成轮次', `${this.completedFocusSessions}`, this.accentColor)
+        this.buildStatCard('累计专注', this.getFocusDurationLabel(), this.accentColor)
       }
       .width('100%')
-      .margin({ top: 2 })
     }
     .width('90%')
-    .backgroundColor('rgba(22,28,38,0.64)')
+    .backgroundColor('rgba(22,28,38,0.66)')
     .borderRadius(30)
     .padding({ left: 18, right: 18, top: 18, bottom: 18 })
     .border({
       width: 1,
-      color: 'rgba(255,255,255,0.08)'
+      color: `${this.accentColor}33`
+    })
+    .shadow({
+      radius: 24,
+      color: `${this.accentColor}1F`,
+      offsetX: 0,
+      offsetY: 10
     })
     .margin({ bottom: 18 })
+  }
+
+  @Builder
+  private buildStatCard(title: string, value: string, accentColor: string) {
+    Column({ space: 8 }) {
+      Text(title)
+        .fontSize(11)
+        .fontColor('rgba(225,231,237,0.68)')
+
+      Text(value)
+        .fontSize(22)
+        .fontWeight(FontWeight.Bold)
+        .fontColor('#FFFFFF')
+    }
+    .layoutWeight(1)
+    .alignItems(HorizontalAlign.Start)
+    .padding(14)
+    .backgroundColor('rgba(255,255,255,0.06)')
+    .border({
+      width: 1,
+      color: `${accentColor}22`
+    })
+    .borderRadius(20)
   }
 }
