@@ -22,9 +22,9 @@ export struct CompanionComponent {
   @Prop continuousDays: number = 0;
   @Prop totalTomatoCount: number = 0;
   @Prop todayTomatoCount: number = 0;
-  @Prop statsVersion: number = 0;
+  @Watch('onStatsVersionChange') @Prop statsVersion: number = 0;
   @Prop animationName: string = 'cat_sleep.json';
-  @Prop dailyTasks: CompanionDailyTask[] = [];
+  @Watch('onTaskBoardChange') @Prop dailyTasks: CompanionDailyTask[] = [];
   @Prop showLevelUpModal: boolean = false;
   @Prop unlockedStageTitle: string = '';
   @Prop unlockedStageReward: string = '';
@@ -45,6 +45,8 @@ export struct CompanionComponent {
   @State talkBubbleOpacity: number = 0;
   @State talkBubbleScale: number = 0.9;
   @State petScale: number = 1;
+  @State renderTick: number = 0;
+  @State displayedStageLevel: number = 1;
 
   private readonly stages: CompanionStage[] = [
     {
@@ -177,6 +179,7 @@ export struct CompanionComponent {
   private isPreparingCatSound: boolean = false;
 
   aboutToAppear(): void {
+    this.syncDisplayedStageLevel();
     void this.loadAnimation();
     this.currentTalkLine = this.stages[0].talkLines[0];
     void this.initCatSoundPlayer();
@@ -189,7 +192,19 @@ export struct CompanionComponent {
   }
 
   private onProgressChange(): void {
+    this.syncDisplayedStageLevel();
+    this.renderTick = this.renderTick + 1;
     this.hideTalkBubbleImmediately();
+    void this.loadAnimation();
+  }
+
+  private onTaskBoardChange(): void {
+    this.renderTick = this.renderTick + 1;
+  }
+
+  private onStatsVersionChange(): void {
+    this.syncDisplayedStageLevel();
+    this.renderTick = this.renderTick + 1;
     void this.loadAnimation();
   }
 
@@ -201,9 +216,13 @@ export struct CompanionComponent {
     this.currentLoadedAnimation = '';
   }
 
+  private syncDisplayedStageLevel(): void {
+    this.displayedStageLevel = this.companionProgress.level;
+  }
+
   private getCurrentStage(): CompanionStage {
     for (let index = this.stages.length - 1; index >= 0; index--) {
-      if (this.companionProgress.level >= this.stages[index].level) {
+      if (this.displayedStageLevel >= this.stages[index].level) {
         return this.stages[index];
       }
     }
@@ -236,17 +255,9 @@ export struct CompanionComponent {
   }
 
   private getTaskProgressText(task: CompanionDailyTask): string {
-    const claimableCount = this.getClaimableCount(task);
     const cycleProgress = task.progress - task.claimedCount * task.target;
     const currentCycleProgress = Math.max(0, cycleProgress);
-    if (claimableCount > 0) {
-      return `已达成 ${task.progress}/${task.target}，可领取 ${claimableCount} 次`;
-    }
-    if (task.claimedCount > 0) {
-      const remainToClaim = Math.max(0, task.target - currentCycleProgress);
-      return `本轮 ${currentCycleProgress}/${task.target}，再完成 ${remainToClaim} 次可领取`;
-    }
-    return `当前 ${currentCycleProgress}/${task.target}，再完成 ${Math.max(0, task.target - currentCycleProgress)} 次可领取`;
+    return `当前 ${currentCycleProgress}/${task.target}`;
   }
 
   private getTaskStatusText(task: CompanionDailyTask): string {
@@ -498,6 +509,11 @@ export struct CompanionComponent {
         .height(0)
         .opacity(0)
 
+      Text(`${this.renderTick}`)
+        .width(0)
+        .height(0)
+        .opacity(0)
+
       Column({ space: 10 }) {
         Text('陪学伙伴')
           .fontSize(28)
@@ -700,7 +716,7 @@ export struct CompanionComponent {
           .padding({ left: 14, right: 14, top: 14, bottom: 14 })
           .backgroundColor('rgba(255,255,255,0.06)')
           .borderRadius(20)
-        }, (task: CompanionDailyTask) => task.id)
+        }, (task: CompanionDailyTask) => `${task.id}_${task.progress}_${task.claimedCount}`)
       }
       .width('90%')
       .padding({ left: 16, right: 16, top: 16, bottom: 16 })

@@ -14,8 +14,8 @@ export struct AuthComponent {
 
   private captchaSettings: RenderingContextSettings = new RenderingContextSettings(true);
   private captchaContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.captchaSettings);
-  private readonly captchaWidth: number = 198;
-  private readonly captchaHeight: number = 72;
+  private readonly captchaWidth: number = 186;
+  private readonly captchaHeight: number = 64;
 
   onModeChange: (mode: AuthMode) => void = () => {};
   onAccountChange: (value: string) => void = () => {};
@@ -135,144 +135,140 @@ export struct AuthComponent {
   }
 
   build(): void {
-    Column({ space: 18 }) {
-      Column({ space: 8 }) {
-        Text(this.getTitle())
-          .fontSize(28)
-          .fontWeight(FontWeight.Bold)
-          .fontColor('#FFFFFF')
-          .textAlign(TextAlign.Center)
+    Column() {
+      Scroll() {
+        Column({ space: 14 }) {
+          Column({ space: 6 }) {
+            Text(this.getTitle())
+              .fontSize(28)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#FFFFFF')
+              .textAlign(TextAlign.Center)
 
-        Text(this.getDescription())
-          .fontSize(13)
-          .fontColor('rgba(255,255,255,0.72)')
-          .textAlign(TextAlign.Center)
-          .lineHeight(22)
-      }
-      .width('100%')
-
-      Row({ space: 10 }) {
-        Button('登录')
-          .layoutWeight(1)
-          .height(40)
-          .fontSize(14)
-          .fontWeight(this.authMode === 'login' ? FontWeight.Bold : FontWeight.Medium)
-          .fontColor(this.authMode === 'login' ? '#182231' : '#E7EDF5')
-          .backgroundColor(this.authMode === 'login' ? '#FFD878' : 'rgba(255,255,255,0.10)')
-          .borderRadius(20)
-          .onClick(() => {
-            this.onModeChange('login');
-            this.refreshCaptcha();
-          })
-
-        Button('注册')
-          .layoutWeight(1)
-          .height(40)
-          .fontSize(14)
-          .fontWeight(this.authMode === 'register' ? FontWeight.Bold : FontWeight.Medium)
-          .fontColor(this.authMode === 'register' ? '#182231' : '#E7EDF5')
-          .backgroundColor(this.authMode === 'register' ? '#FFD878' : 'rgba(255,255,255,0.10)')
-          .borderRadius(20)
-          .onClick(() => {
-            this.onModeChange('register');
-            this.refreshCaptcha();
-          })
-      }
-      .width('100%')
-
-      if (this.authMode === 'register') {
-        this.buildInput('昵称', '输入你的学习昵称', this.nickname, false, (value: string) => {
-          this.onNicknameChange(value);
-        })
-      }
-
-      this.buildInput('账号', '请输入账号', this.account, false, (value: string) => {
-        this.onAccountChange(value);
-      })
-
-      this.buildInput('密码', '请输入密码', this.password, true, (value: string) => {
-        this.onPasswordChange(value);
-      })
-
-      if (this.authMode === 'register') {
-        this.buildInput('确认密码', '再次输入密码', this.confirmPassword, true, (value: string) => {
-          this.onConfirmPasswordChange(value);
-        })
-      }
-
-      Column({ space: 8 }) {
-        Text('图形验证码')
-          .fontSize(13)
-          .fontColor('rgba(255,255,255,0.72)')
+            Text(this.getDescription())
+              .fontSize(13)
+              .fontColor('rgba(255,255,255,0.72)')
+              .textAlign(TextAlign.Center)
+              .lineHeight(20)
+          }
           .width('100%')
-          .textAlign(TextAlign.Start)
 
-        Row({ space: 10 }) {
-          TextInput({ placeholder: '请输入验证码', text: this.captchaInput })
-            .layoutWeight(1)
-            .placeholderColor('rgba(255,255,255,0.32)')
-            .fontSize(14)
-            .fontColor('#FFFFFF')
-            .type(InputType.Normal)
-            .height(46)
-            .backgroundColor('rgba(255,255,255,0.08)')
-            .borderRadius(18)
-            .padding({ left: 16, right: 16 })
-            .onChange((nextValue: string) => {
-              this.captchaInput = nextValue;
-              this.captchaError = '';
-            })
+          Row({ space: 8 }) {
+            Button('登录')
+              .layoutWeight(1)
+              .height(38)
+              .fontSize(14)
+              .fontWeight(this.authMode === 'login' ? FontWeight.Bold : FontWeight.Medium)
+              .fontColor(this.authMode === 'login' ? '#182231' : '#E7EDF5')
+              .backgroundColor(this.authMode === 'login' ? '#FFD878' : 'rgba(255,255,255,0.10)')
+              .borderRadius(20)
+              .onClick(() => {
+                this.onModeChange('login');
+                this.refreshCaptcha();
+              })
 
-          Canvas(this.captchaContext)
-            .width(this.captchaWidth)
-            .height(this.captchaHeight)
-            .borderRadius(14)
-            .clip(true)
-            .backgroundColor('rgba(255,255,255,0.12)')
-            .onReady(() => {
-              this.drawCaptcha();
+            Button('注册')
+              .layoutWeight(1)
+              .height(38)
+              .fontSize(14)
+              .fontWeight(this.authMode === 'register' ? FontWeight.Bold : FontWeight.Medium)
+              .fontColor(this.authMode === 'register' ? '#182231' : '#E7EDF5')
+              .backgroundColor(this.authMode === 'register' ? '#FFD878' : 'rgba(255,255,255,0.10)')
+              .borderRadius(20)
+              .onClick(() => {
+                this.onModeChange('register');
+                this.refreshCaptcha();
+              })
+          }
+          .width('100%')
+
+          if (this.authMode === 'register') {
+            this.buildInput('昵称', '输入你的学习昵称', this.nickname, false, (value: string) => {
+              this.onNicknameChange(value);
             })
+          }
+
+          this.buildInput('账号', '请输入账号', this.account, false, (value: string) => {
+            this.onAccountChange(value);
+          })
+
+          this.buildInput('密码', '请输入密码', this.password, true, (value: string) => {
+            this.onPasswordChange(value);
+          })
+
+          if (this.authMode === 'register') {
+            this.buildInput('确认密码', '再次输入密码', this.confirmPassword, true, (value: string) => {
+              this.onConfirmPasswordChange(value);
+            })
+          }
+
+          Column({ space: 6 }) {
+            Text('图形验证码')
+              .fontSize(13)
+              .fontColor('rgba(255,255,255,0.72)')
+              .width('100%')
+              .textAlign(TextAlign.Start)
+
+            Row({ space: 8 }) {
+              TextInput({ placeholder: '请输入验证码', text: this.captchaInput })
+                .layoutWeight(1)
+                .placeholderColor('rgba(255,255,255,0.32)')
+                .fontSize(14)
+                .fontColor('#FFFFFF')
+                .type(InputType.Normal)
+                .height(42)
+                .backgroundColor('rgba(255,255,255,0.08)')
+                .borderRadius(16)
+                .padding({ left: 16, right: 16 })
+                .onChange((nextValue: string) => {
+                  this.captchaInput = nextValue;
+                  this.captchaError = '';
+                })
+
+              Canvas(this.captchaContext)
+                .width(this.captchaWidth)
+                .height(this.captchaHeight)
+                .borderRadius(12)
+                .clip(true)
+                .backgroundColor('rgba(255,255,255,0.12)')
+                .onReady(() => {
+                  this.drawCaptcha();
+                })
+                .onClick(() => {
+                  this.refreshCaptcha();
+                })
+            }
+
+            Text(this.captchaError === '' ? '点击验证码图片可刷新。' : this.captchaError)
+              .fontSize(10)
+              .fontColor(this.captchaError === '' ? 'rgba(255,255,255,0.40)' : '#FFB4A6')
+              .width('100%')
+              .textAlign(TextAlign.Start)
+          }
+          .width('100%')
+
+          Button(this.authMode === 'login' ? '进入自习室' : '注册进入')
+            .width('100%')
+            .height(44)
+            .fontSize(15)
+            .fontWeight(FontWeight.Bold)
+            .fontColor('#182231')
+            .backgroundColor('#FFD878')
+            .borderRadius(24)
+            .padding({ left: 12, right: 12 })
+            .margin({ top: 2, bottom: 4 })
             .onClick(() => {
-              this.refreshCaptcha();
+              this.submitWithCaptcha();
             })
         }
-
-        Text(this.captchaError === '' ? '点击验证码图片可刷新。' : this.captchaError)
-          .fontSize(11)
-          .fontColor(this.captchaError === '' ? 'rgba(255,255,255,0.40)' : '#FFB4A6')
-          .width('100%')
-          .textAlign(TextAlign.Start)
-      }
-      .width('100%')
-
-      Button(this.authMode === 'login' ? '进入自习室' : '注册并进入')
         .width('100%')
-        .height(48)
-        .fontSize(15)
-        .fontWeight(FontWeight.Bold)
-        .fontColor('#182231')
-        .backgroundColor('#FFD878')
-        .borderRadius(24)
-        .margin({ top: 6 })
-        .onClick(() => {
-          this.submitWithCaptcha();
-        })
-
-      Column({ space: 6 }) {
-        Text('当前是本地账号演示版')
-          .fontSize(12)
-          .fontColor('rgba(255,255,255,0.48)')
-
-        Text('登录和注册都会校验图形验证码。')
-          .fontSize(11)
-          .fontColor('rgba(255,255,255,0.38)')
-          .textAlign(TextAlign.Center)
       }
-      .width('100%')
-      .margin({ top: 2 })
+      .scrollBar(BarState.Off)
+      .edgeEffect(EdgeEffect.Spring)
     }
     .width('88%')
-    .padding({ left: 22, right: 22, top: 26, bottom: 26 })
+    .height('78%')
+    .padding({ left: 20, right: 20, top: 22, bottom: 22 })
     .backgroundColor('rgba(18,24,34,0.76)')
     .borderRadius(30)
     .border({

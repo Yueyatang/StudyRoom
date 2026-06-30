@@ -417,6 +417,7 @@ struct StudyRoom {
     this.latestClaimSummary = '';
     this.refreshCompanionTaskBoard();
     this.refreshStatsView();
+    this.statsVersion = this.statsVersion + 1;
     if (this.companionProgress.level > previousLevel) {
       this.showCompanionLevelUpModal = true;
       this.unlockedStageTitle = `Lv.${this.companionProgress.level}`;
@@ -682,10 +683,10 @@ struct StudyRoom {
       {
         id: 1003,
         text: '复习 ArkTS 状态管理',
-        completed: false,
+        completed: true,
         pinned: false,
-        estimatedTomatoes: 2,
-        doneTomatoes: 0
+        estimatedTomatoes: 1,
+        doneTomatoes: 1
       },
       {
         id: 1004,
@@ -712,7 +713,7 @@ struct StudyRoom {
         title: '每日来打卡',
         description: '主人今天来啦，猫猫先蹭蹭你一下喵。',
         reward: 8,
-        progress: 0,
+        progress: 1,
         target: 1,
         claimedCount: 0
       },
@@ -723,7 +724,7 @@ struct StudyRoom {
         reward: 12,
         progress: 3,
         target: 1,
-        claimedCount: 3
+        claimedCount: 2
       },
       {
         id: 'finish_todo',
@@ -732,19 +733,19 @@ struct StudyRoom {
         reward: 25,
         progress: 2,
         target: 1,
-        claimedCount: 2
+        claimedCount: 1
       },
       {
         id: 'immersion_twenty',
         title: '沉浸视频学习 20 分钟',
         description: '陪我看着你沉浸学 20 分钟，猫猫就更安心啦喵。',
         reward: 20,
-        progress: 0,
+        progress: 1,
         target: 1,
         claimedCount: 0
       }
     ];
-    this.immersionTaskMinutes = 19;
+    this.immersionTaskMinutes = 20;
     this.latestClaimSummary = '';
     this.refreshStatsView();
   }
