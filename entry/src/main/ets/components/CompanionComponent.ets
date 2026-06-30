@@ -1,5 +1,6 @@
 import util from '@ohos.util';
 import lottie, { AnimationItem } from '@ohos/lottie';
+import media from '@ohos.multimedia.media';
 import { CompanionDailyTask, CompanionProgress } from '../common/StudyRoomTypes';
 
 interface CompanionStage {
@@ -13,6 +14,7 @@ interface CompanionStage {
   glowColor: string;
   badgeText: string;
   skinName: string;
+  talkLines: string[];
 }
 
 @Component
@@ -22,13 +24,13 @@ export struct CompanionComponent {
   @Prop todayTomatoCount: number = 0;
   @Prop statsVersion: number = 0;
   @Prop animationName: string = 'cat_sleep.json';
-  @Prop pendingAffinity: number = 0;
   @Prop dailyTasks: CompanionDailyTask[] = [];
   @Prop showLevelUpModal: boolean = false;
   @Prop unlockedStageTitle: string = '';
   @Prop unlockedStageReward: string = '';
   @Prop latestClaimSummary: string = '';
-  onClaimAffinity: () => void = () => {};
+  onClaimTaskReward: (taskId: string) => void = () => {};
+  onGoToTask: (taskId: string) => void = () => {};
   onDismissLevelUp: () => void = () => {};
   @Watch('onProgressChange') @Prop companionProgress: CompanionProgress = {
     level: 1,
@@ -37,81 +39,117 @@ export struct CompanionComponent {
     nextLevelAffinity: 100
   };
 
+  @State currentTalkLine: string = '';
+  @State talkBubbleVisible: boolean = false;
+  @State talkBubbleOpacity: number = 0;
+  @State talkBubbleScale: number = 0.92;
+
   private readonly stages: CompanionStage[] = [
     {
       level: 1,
       title: '初遇陪伴',
-      subtitle: '小猫刚住进自习室，会安静地陪你开始第一段专注。',
-      hint: '继续积累默契值，角色会越来越熟悉你的学习节奏。',
+      subtitle: '小猫刚住进自习室，正悄悄观察主人的学习节奏。',
+      hint: '主人别急，我会乖乖陪你把今天的小目标做完喵。',
       unlockText: '解锁基础陪伴动作',
       animationName: 'cat_sleep.json',
       accentColor: '#FFD29A',
       glowColor: 'rgba(255, 210, 154, 0.32)',
       badgeText: 'Lv.1 初遇',
-      skinName: '奶油猫'
+      skinName: '奶油猫',
+      talkLines: [
+        '主人摸摸我，再学一小会儿好不好喵？',
+        '我会安静陪着你，你只管认真看书喵。',
+        '今天也一起把小目标慢慢做完吧喵。'
+      ]
     },
     {
       level: 2,
-      title: '抖耳回应',
-      subtitle: '它已经开始回应你的努力，会用轻轻抖耳传递存在感。',
-      hint: '完成更多番茄和任务，默契值满后就能继续升级。',
+      title: '熟悉陪学',
+      subtitle: '你们渐渐熟起来了，小猫会用小动作悄悄回应你。',
+      hint: '你一专心，我就想再靠近一点点喵。',
       unlockText: '解锁抖耳回应动作',
       animationName: 'black_cat_shake_ear.json',
       accentColor: '#B7C4D6',
       glowColor: 'rgba(183, 196, 214, 0.24)',
       badgeText: 'Lv.2 熟悉',
-      skinName: '黑猫皮肤'
+      skinName: '黑猫皮肤',
+      talkLines: [
+        '主人刚刚那一下好认真，我都看见啦喵。',
+        '再坚持一下下，我想看你完成这一轮喵。',
+        '你这么努力，我也会更乖一点喵。'
+      ]
     },
     {
       level: 3,
       title: '安心陪读',
-      subtitle: '它已经完全信任你，开始进入稳定陪读状态。',
-      hint: '这个阶段很适合固定学习节奏，默契值会增长得更快。',
-      unlockText: '解锁夜色陪读形态',
+      subtitle: '小猫已经很信任你，会安静地陪你沉浸学习。',
+      hint: '主人坐好好学，我会趴在旁边等你完成这一轮喵。',
+      unlockText: '解锁陪读形态',
       animationName: 'black_cat_sleep.json',
       accentColor: '#9FA9C9',
       glowColor: 'rgba(159, 169, 201, 0.24)',
       badgeText: 'Lv.3 陪读',
-      skinName: '夜色黑猫'
+      skinName: '夜色黑猫',
+      talkLines: [
+        '别担心难题，我会一直在旁边守着你喵。',
+        '你认真学习的样子，让猫猫很安心喵。',
+        '安静一点没关系，我知道你正在变厉害喵。'
+      ]
     },
     {
       level: 4,
       title: '活力搭子',
-      subtitle: '角色开始变得更活泼，说明你们已经建立了高频陪学关系。',
-      hint: '完成任务会带来额外默契值，适合冲刺下一等级。',
-      unlockText: '解锁玩球互动动作',
+      subtitle: '陪伴关系越来越亲密，小猫也变得更活泼啦。',
+      hint: '做完任务记得回来找我，我想大声夸夸主人喵。',
+      unlockText: '解锁活力动作',
       animationName: 'blue_cat_playball.json',
       accentColor: '#8ACBFF',
       glowColor: 'rgba(138, 203, 255, 0.26)',
       badgeText: 'Lv.4 活力',
-      skinName: '晴空蓝猫'
+      skinName: '晴空蓝猫',
+      talkLines: [
+        '主人今天超棒，再来一轮也没问题喵。',
+        '我已经准备好继续陪你冲刺啦喵。',
+        '做完这项任务，我就给你一个猫猫夸夸喵。'
+      ]
     },
     {
       level: 5,
-      title: '深度默契',
-      subtitle: '它会安静守着你，像一个真正熟悉你的学习搭子。',
-      hint: '持续完成每日目标，会更快积累默契值。',
-      unlockText: '解锁深海休憩皮肤',
+      title: '默契升级',
+      subtitle: '你们越来越有默契，小猫已经懂你的学习节奏了。',
+      hint: '你认真学习的样子最好看，猫猫会一直守着你喵。',
+      unlockText: '解锁深海皮肤',
       animationName: 'blue_cat_sleep.json',
       accentColor: '#9EE2FF',
       glowColor: 'rgba(158, 226, 255, 0.26)',
       badgeText: 'Lv.5 默契',
-      skinName: '深海蓝猫'
+      skinName: '深海蓝猫',
+      talkLines: [
+        '你一翻书，我就知道今天又要变厉害了喵。',
+        '主人别急，慢慢来，我会一直守着你喵。',
+        '今天的认真，我都替你悄悄记下来啦喵。'
+      ]
     },
     {
       level: 6,
       title: '专属陪伴',
-      subtitle: '你们已经成为非常稳定的陪学组合，解锁了更稀有的陪伴形态。',
-      hint: '当前已达到最高等级，后续可以继续扩展隐藏动作与限定皮肤。',
-      unlockText: '解锁限定翻滚动作',
+      subtitle: '你们已经成为超稳定的陪学组合，猫猫最喜欢你啦。',
+      hint: '今天也一起慢慢变厉害吧，我可是主人的专属小猫喵。',
+      unlockText: '解锁限定动作',
       animationName: 'orange_cat_sleep_roll.json',
       accentColor: '#FFB26B',
       glowColor: 'rgba(255, 178, 107, 0.28)',
-      badgeText: 'Lv.6 羁绊',
-      skinName: '橘猫限定'
+      badgeText: 'Lv.6 专属',
+      skinName: '橘猫限定',
+      talkLines: [
+        '主人是我最喜欢的学习搭子喵。',
+        '再摸摸我吧，摸完继续学习会更顺喵。',
+        '你努力的每一小步，猫猫都会给你鼓掌喵。'
+      ]
     }
   ];
 
+  private readonly catSounds: string[] = ['cat1.wav', 'cat2.wav', 'cat3.wav'];
   private renderingSettings: RenderingContextSettings = new RenderingContextSettings(true);
   private canvasRenderingContext: CanvasRenderingContext2D = new CanvasRenderingContext2D(this.renderingSettings);
   private animateItem: AnimationItem | null = null;
@@ -119,16 +157,29 @@ export struct CompanionComponent {
   private lottieDataCache: Map<string, Object> = new Map<string, Object>();
   private currentLoadedAnimation: string = '';
   private isLoading: boolean = false;
+  private talkHideTimer: number = -1;
+  private catSoundPlayer: media.AVPlayer | null = null;
+  private catSoundState: media.AVPlayerState = 'idle';
+  private catSoundName: string = '';
+  private isPreparingCatSound: boolean = false;
 
   aboutToAppear(): void {
     void this.loadAnimation();
+    this.currentTalkLine = this.stages[0].talkLines[0];
+    void this.initCatSoundPlayer();
   }
 
   aboutToDisappear(): void {
     this.destroyAnimation();
+    if (this.talkHideTimer !== -1) {
+      clearTimeout(this.talkHideTimer);
+      this.talkHideTimer = -1;
+    }
+    void this.releaseCatSoundPlayer();
   }
 
   private onProgressChange(): void {
+    this.hideTalkBubbleImmediately();
     void this.loadAnimation();
   }
 
@@ -149,15 +200,6 @@ export struct CompanionComponent {
     return this.stages[0];
   }
 
-  private getNextStage(): CompanionStage | null {
-    for (let index = 0; index < this.stages.length; index++) {
-      if (this.stages[index].level > this.companionProgress.level) {
-        return this.stages[index];
-      }
-    }
-    return null;
-  }
-
   private getAffinityProgress(): number {
     if (this.companionProgress.nextLevelAffinity <= 0) {
       return 1;
@@ -167,10 +209,10 @@ export struct CompanionComponent {
 
   private getAffinityProgressText(): string {
     if (this.companionProgress.level >= 6) {
-      return '当前已达到最高陪伴等级。';
+      return '你们已经到达最高陪伴等级啦。';
     }
     const remain: number = Math.max(0, this.companionProgress.nextLevelAffinity - this.companionProgress.currentLevelAffinity);
-    return `再获得 ${remain} 点默契值即可升级。`;
+    return `再获得 ${remain} 点默契值，就能解锁下一阶段喵。`;
   }
 
   private getStageAnimationName(): string {
@@ -179,17 +221,92 @@ export struct CompanionComponent {
   }
 
   private getTaskProgressText(task: CompanionDailyTask): string {
-    return `${Math.min(task.progress, task.target)}/${task.target}`;
+    const claimableCount = this.getClaimableCount(task);
+    if (claimableCount > 0) {
+      return `可领取 ${claimableCount} 次`;
+    }
+    if (task.claimedCount > 0) {
+      return `已完成 ${task.progress} 次`;
+    }
+    return `${task.progress}/${task.target}`;
+  }
+
+  private getClaimableCount(task: CompanionDailyTask): number {
+    const available = Math.floor(task.progress / task.target) - task.claimedCount;
+    return Math.max(0, available);
   }
 
   private getTaskStatusText(task: CompanionDailyTask): string {
-    if (task.claimed) {
-      return '已完成';
+    const claimableCount = this.getClaimableCount(task);
+    if (claimableCount > 0) {
+      return '领取';
     }
-    if (task.completed) {
-      return '可领取';
+    if (task.claimedCount > 0) {
+      return '已完成·可继续';
     }
-    return '进行中';
+    return '去完成';
+  }
+
+  private canClaimTask(task: CompanionDailyTask): boolean {
+    return this.getClaimableCount(task) > 0;
+  }
+
+  private getTaskButtonFontColor(task: CompanionDailyTask): string {
+    if (this.canClaimTask(task)) {
+      return '#1A2432';
+    }
+    return '#F8FBFF';
+  }
+
+  private getTaskButtonBackground(task: CompanionDailyTask): string {
+    if (this.canClaimTask(task)) {
+      return '#FFD878';
+    }
+    if (task.claimedCount > 0) {
+      return 'rgba(126,223,167,0.18)';
+    }
+    return 'rgba(255,255,255,0.10)';
+  }
+
+  private hideTalkBubbleImmediately(): void {
+    this.talkBubbleVisible = false;
+    this.talkBubbleOpacity = 0;
+    this.talkBubbleScale = 0.92;
+    if (this.talkHideTimer !== -1) {
+      clearTimeout(this.talkHideTimer);
+      this.talkHideTimer = -1;
+    }
+  }
+
+  private showTalkBubble(): void {
+    this.talkBubbleVisible = true;
+    this.talkBubbleOpacity = 0;
+    this.talkBubbleScale = 0.92;
+    animateTo({ duration: 220, curve: Curve.EaseOut }, () => {
+      this.talkBubbleOpacity = 1;
+      this.talkBubbleScale = 1;
+    });
+    if (this.talkHideTimer !== -1) {
+      clearTimeout(this.talkHideTimer);
+    }
+    this.talkHideTimer = setTimeout(() => {
+      animateTo({ duration: 180, curve: Curve.EaseIn }, () => {
+        this.talkBubbleOpacity = 0;
+        this.talkBubbleScale = 0.94;
+      });
+      this.talkHideTimer = setTimeout(() => {
+        this.talkBubbleVisible = false;
+        this.talkHideTimer = -1;
+      }, 200) as number;
+    }, 2400) as number;
+  }
+
+  private async pickTalkLine(): Promise<void> {
+    const stage: CompanionStage = this.getCurrentStage();
+    const randomIndex: number = Math.floor(Math.random() * stage.talkLines.length);
+    this.currentTalkLine = stage.talkLines[randomIndex];
+    this.showTalkBubble();
+    await this.playRandomCatSound();
   }
 
   private async ensureLottieData(fileName: string): Promise<void> {
@@ -241,10 +358,90 @@ export struct CompanionComponent {
     });
   }
 
+  private async initCatSoundPlayer(): Promise<void> {
+    try {
+      this.catSoundPlayer = await media.createAVPlayer();
+      this.catSoundPlayer.on('stateChange', (state: media.AVPlayerState) => {
+        this.catSoundState = state;
+      });
+    } catch (error) {
+      console.error(`[CompanionComponent] init cat sound failed: ${JSON.stringify(error)}`);
+    }
+  }
+
+  private async waitForCatSoundState(expectedState: media.AVPlayerState, timeoutMs: number = 1800): Promise<void> {
+    const startTime = Date.now();
+    while (this.catSoundState !== expectedState) {
+      if (Date.now() - startTime > timeoutMs) {
+        throw new Error(`wait cat sound state timeout: expected=${expectedState}, current=${this.catSoundState}`);
+      }
+      await new Promise<void>((resolve) => {
+        setTimeout(() => resolve(), 60);
+      });
+    }
+  }
+
+  private async stopCatSoundPlayback(): Promise<void> {
+    if (this.catSoundPlayer === null) {
+      return;
+    }
+    if (this.catSoundState === 'playing' || this.catSoundState === 'paused' || this.catSoundState === 'completed') {
+      try {
+        await this.catSoundPlayer.stop();
+      } catch (error) {
+        console.error(`[CompanionComponent] stop cat sound skipped: ${JSON.stringify(error)}`);
+      }
+    }
+    if (this.catSoundState !== 'idle' && this.catSoundState !== 'released') {
+      try {
+        await this.catSoundPlayer.reset();
+      } catch (error) {
+        console.error(`[CompanionComponent] reset cat sound skipped: ${JSON.stringify(error)}`);
+      }
+    }
+  }
+
+  private async playRandomCatSound(): Promise<void> {
+    if (this.catSoundPlayer === null || this.isPreparingCatSound) {
+      return;
+    }
+    this.isPreparingCatSound = true;
+    try {
+      const soundName: string = this.catSounds[Math.floor(Math.random() * this.catSounds.length)];
+      this.catSoundName = soundName;
+      await this.stopCatSoundPlayback();
+      const rawFd = await getContext(this).resourceManager.getRawFd(soundName);
+      this.catSoundPlayer.fdSrc = {
+        fd: rawFd.fd,
+        offset: rawFd.offset,
+        length: rawFd.length
+      };
+      await this.waitForCatSoundState('initialized');
+      await this.catSoundPlayer.prepare();
+      await this.waitForCatSoundState('prepared');
+      await this.catSoundPlayer.play();
+    } catch (error) {
+      console.error(`[CompanionComponent] play cat sound failed: ${JSON.stringify(error)}`);
+    } finally {
+      this.isPreparingCatSound = false;
+    }
+  }
+
+  private async releaseCatSoundPlayer(): Promise<void> {
+    if (this.catSoundPlayer !== null) {
+      try {
+        await this.catSoundPlayer.release();
+      } catch (error) {
+        console.error(`[CompanionComponent] release cat sound failed: ${JSON.stringify(error)}`);
+      }
+      this.catSoundPlayer = null;
+    }
+  }
+
   build(): void {
     Stack() {
       Scroll() {
-        this.buildContent(this.getCurrentStage(), this.getNextStage())
+        this.buildContent(this.getCurrentStage())
       }
       .width('100%')
       .height('100%')
@@ -259,7 +456,7 @@ export struct CompanionComponent {
   }
 
   @Builder
-  private buildContent(stage: CompanionStage, nextStage: CompanionStage | null): void {
+  private buildContent(stage: CompanionStage): void {
     Column({ space: 18 }) {
       Text(`${this.statsVersion}`)
         .width(0)
@@ -267,7 +464,7 @@ export struct CompanionComponent {
         .opacity(0)
 
       Column({ space: 10 }) {
-        Text('陪伴角色')
+        Text('陪学伙伴')
           .fontSize(28)
           .fontWeight(FontWeight.Bold)
           .fontColor('#FFFFFF')
@@ -326,10 +523,10 @@ export struct CompanionComponent {
       .borderRadius(24)
 
       Column() {
-        Stack({ alignContent: Alignment.Bottom }) {
+        Stack() {
           Column()
             .width('100%')
-            .height(330)
+            .height(340)
             .borderRadius(32)
             .linearGradient({
               angle: 180,
@@ -343,12 +540,39 @@ export struct CompanionComponent {
             .width(280)
             .height(280)
             .backgroundColor('rgba(255,255,255,0.03)')
+            .margin({ top: 30 })
+            .onClick(() => {
+              void this.pickTalkLine();
+            })
             .onReady(() => {
               this.canvasRenderingContext.imageSmoothingEnabled = true;
               this.canvasRenderingContext.imageSmoothingQuality = 'medium';
               this.currentLoadedAnimation = '';
               void this.loadAnimation();
             })
+
+          if (this.talkBubbleVisible && this.currentTalkLine !== '') {
+            Column() {
+              Text(this.currentTalkLine)
+                .fontSize(12)
+                .fontColor('#243244')
+                .lineHeight(18)
+                .textAlign(TextAlign.Start)
+            }
+            .width('50%')
+            .padding({ left: 12, right: 12, top: 10, bottom: 10 })
+            .backgroundColor('#FFF8E8')
+            .borderRadius(18)
+            .opacity(this.talkBubbleOpacity)
+            .scale({ x: this.talkBubbleScale, y: this.talkBubbleScale })
+            .shadow({
+              radius: 18,
+              color: 'rgba(0,0,0,0.12)',
+              offsetX: 0,
+              offsetY: 8
+            })
+            .position({ x: '8%', y: '18%' })
+          }
 
           Column({ space: 8 }) {
             Text(stage.badgeText)
@@ -364,10 +588,11 @@ export struct CompanionComponent {
           .padding({ left: 14, right: 14, top: 10, bottom: 10 })
           .backgroundColor('rgba(10,14,22,0.34)')
           .borderRadius(18)
-          .margin({ bottom: 18 })
+          .position({ x: '33%', y: '82%' })
         }
       }
       .width('90%')
+      .height(340)
       .clip(true)
       .backgroundColor('rgba(255,255,255,0.08)')
       .border({
@@ -375,63 +600,15 @@ export struct CompanionComponent {
         color: 'rgba(255,255,255,0.10)'
       })
       .borderRadius(32)
-      .alignItems(HorizontalAlign.Center)
-
-      Row({ space: 12 }) {
-        Column({ space: 8 }) {
-          Text('待领取默契值')
-            .fontSize(13)
-            .fontColor('rgba(255,255,255,0.60)')
-            .width('100%')
-            .textAlign(TextAlign.Start)
-
-          Text(`${this.pendingAffinity}`)
-            .fontSize(28)
-            .fontWeight(FontWeight.Bold)
-            .fontColor('#FFD878')
-            .width('100%')
-            .textAlign(TextAlign.Start)
-
-          Text(this.latestClaimSummary === '' ? '完成番茄、推进任务、达成目标后，会先累积到这里。' : this.latestClaimSummary)
-            .fontSize(12)
-            .fontColor('rgba(255,255,255,0.66)')
-            .width('100%')
-            .textAlign(TextAlign.Start)
-            .lineHeight(20)
-        }
-        .layoutWeight(1)
-        .alignItems(HorizontalAlign.Start)
-
-        Button(this.pendingAffinity > 0 ? `领取 ${this.pendingAffinity}` : '暂无奖励')
-          .enabled(this.pendingAffinity > 0)
-          .fontSize(14)
-          .fontWeight(FontWeight.Bold)
-          .fontColor(this.pendingAffinity > 0 ? '#1A2432' : 'rgba(255,255,255,0.36)')
-          .height(42)
-          .padding({ left: 18, right: 18 })
-          .backgroundColor(this.pendingAffinity > 0 ? '#FFD878' : 'rgba(255,255,255,0.10)')
-          .borderRadius(20)
-          .onClick(() => {
-            this.onClaimAffinity();
-          })
-      }
-      .width('90%')
-      .padding({ left: 16, right: 16, top: 16, bottom: 16 })
-      .backgroundColor('rgba(255,255,255,0.08)')
-      .borderRadius(24)
 
       Column({ space: 12 }) {
         Row() {
-          Text('每日互动任务')
+          Text('陪伴任务板')
             .fontSize(18)
             .fontWeight(FontWeight.Bold)
             .fontColor('#FFFFFF')
 
           Blank()
-
-          Text('像游戏任务列表一样完成它们')
-            .fontSize(11)
-            .fontColor('rgba(255,255,255,0.56)')
         }
         .width('100%')
 
@@ -468,13 +645,20 @@ export struct CompanionComponent {
             .layoutWeight(1)
             .alignItems(HorizontalAlign.Start)
 
-            Text(this.getTaskStatusText(task))
+            Button(this.getTaskStatusText(task))
               .fontSize(12)
               .fontWeight(FontWeight.Bold)
-              .fontColor(task.claimed ? 'rgba(255,255,255,0.40)' : task.completed ? '#9EE2FF' : '#FFD878')
+              .fontColor(this.getTaskButtonFontColor(task))
               .padding({ left: 12, right: 12, top: 8, bottom: 8 })
-              .backgroundColor(task.claimed ? 'rgba(255,255,255,0.08)' : task.completed ? 'rgba(158,226,255,0.14)' : 'rgba(255,216,120,0.12)')
+              .backgroundColor(this.getTaskButtonBackground(task))
               .borderRadius(14)
+              .onClick(() => {
+                if (this.canClaimTask(task)) {
+                  this.onClaimTaskReward(task.id);
+                } else {
+                  this.onGoToTask(task.id);
+                }
+              })
           }
           .width('100%')
           .padding({ left: 14, right: 14, top: 14, bottom: 14 })
@@ -496,9 +680,6 @@ export struct CompanionComponent {
 
       Column({ space: 12 }) {
         this.buildInfoCard('当前皮肤', stage.skinName, '#FFFFFF')
-        this.buildInfoCard('当前台词', stage.hint, '#FFFFFF')
-        this.buildInfoCard('累计默契值', `${this.companionProgress.totalAffinity}`, stage.accentColor)
-        this.buildInfoCard('下一阶段', nextStage === null ? '已解锁全部阶段' : nextStage.title, stage.accentColor)
       }
       .width('90%')
       .margin({ bottom: 28 })
@@ -521,7 +702,7 @@ export struct CompanionComponent {
           .fontWeight(FontWeight.Bold)
           .fontColor('#FFFFFF')
 
-        Text(`已解锁 Lv.${this.companionProgress.level} · ${this.unlockedStageTitle}`)
+        Text(`已解锁 ${this.unlockedStageTitle}`)
           .fontSize(15)
           .fontColor(stage.accentColor)
 
@@ -538,7 +719,7 @@ export struct CompanionComponent {
           .backgroundColor('rgba(255,255,255,0.08)')
           .borderRadius(14)
 
-        Button('我知道了')
+        Button('我知道啦')
           .fontSize(15)
           .fontWeight(FontWeight.Bold)
           .fontColor('#1A2432')

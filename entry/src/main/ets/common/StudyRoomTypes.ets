@@ -33,8 +33,7 @@ export interface CompanionDailyTask {
   reward: number;
   progress: number;
   target: number;
-  completed: boolean;
-  claimed: boolean;
+  claimedCount: number;
 }
 
 export interface SceneData {
